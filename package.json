@@ -1,0 +1,22 @@
+{
+  "name": "cloudroom-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloud-only stdio MCP gateway for room-cli",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check server.mjs && node --check src/config.mjs && node --check src/cli.mjs && node --check src/service.mjs && node --check src/schemas.mjs && node --check src/locks.mjs && node --check src/github.mjs && node --check src/projects.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0"
+  }
+}

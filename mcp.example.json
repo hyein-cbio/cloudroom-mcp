@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "room": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/cloudroom-mcp/server.mjs"
+      ],
+      "description": "Cloud-only Cloudroom agent execution: spawn, tell, get, stop.",
+      "exposure": "direct",
+      "timeout": 60
+    }
+  }
+}
