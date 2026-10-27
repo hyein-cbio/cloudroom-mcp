@@ -22,28 +22,26 @@ test('spawn forces cloud and explicit high/high defaults, omitting an unconfigur
   assert.equal(result.completion_verified, false);
 });
 
-test('spawn passes a title like --machine=local as one argv entry, never a separate option', async t => {
+test('spawn binds option-like titles to --title= without changing Cloud argv', async t => {
   const config = await tempConfig(t);
   const cli = fakeCli();
   const service = createService(config, cli.run);
-  const hostile = '--machine=local';
-  for (const title of [hostile, '-machine', ' --machine=local', '-']) {
-    await assert.rejects(service.call('thread_spawn', { request_id: randomUUID(), prompt: 'hi', title }));
+  for (const title of [
+    '--machine=local', '-machine', '-', '- TODO', '--help 사용법',
+    '--title=--machine=local', 'note --machine=local', 'note "quoted" = --machine=local',
+  ]) {
+    const request_id = randomUUID();
+    await service.call('thread_spawn', { request_id, prompt: 'hi', title: `  ${title}  ` });
+    const args = threadCalls(cli).filter(call => call.args[1] === 'spawn').at(-1).args;
+    assert.deepEqual(args, [
+      'thread', 'spawn', '--machine', 'cloud', '--project', 'proj_test',
+      '--provider', 'acp-devin', '--model', 'gpt-6-1-sol-high', '--reasoning-level', 'high',
+      '--request-id', request_id, '--prompt=hi', '--json', '--title=' + title,
+    ]);
+    assert.equal(args.includes('--title'), false);
+    assert.equal(args.includes('--machine=local'), false);
+    assert.equal(args.includes(title), false);
   }
-  assert.deepEqual(cli.calls, []);
-
-  const request_id = randomUUID();
-  const title = 'note --machine=local';
-  await service.call('thread_spawn', { request_id, prompt: 'hi', title: `  ${title}  ` });
-  const args = threadCalls(cli).find(call => call.args[1] === 'spawn').args;
-  assert.deepEqual(args, [
-    'thread', 'spawn', '--machine', 'cloud', '--project', 'proj_test',
-    '--provider', 'acp-devin', '--model', 'gpt-6-1-sol-high', '--reasoning-level', 'high',
-    '--request-id', request_id, '--prompt=hi', '--json', '--title=' + title,
-  ]);
-  assert.equal(args.includes('--title'), false);
-  assert.equal(args.includes(hostile), false);
-  assert.equal(args.includes(title), false);
 });
 
 test('spawn accepts explicit option overrides only for allowlisted GitHub repositories', async t => {

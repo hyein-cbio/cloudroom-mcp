@@ -33,9 +33,10 @@ export const schemas = {
     github_repo: githubRepo.optional().describe('GitHub owner/repository only, e.g. owner/repository. No URLs, IDs, project names or local paths. Must be server-allowlisted. Omitted: configured repository, or Personal when none is configured.'),
     machine: z.literal('cloud').optional().describe('Cloud only. Local/native execution is intentionally unsupported.'),
     base_branch: branch.optional().describe('Repository projects only: pushed GitHub branch/ref. Omitted unless configured. Not applicable to proj_personal; do not specify it for Personal. No local file upload.'),
+    // Review: leading '-' is valid title text (e.g. '- TODO' or '--help 사용법').
+    // Bind it with --title= in the CLI layer instead of restricting normal titles here.
     title: z.string().trim().min(1).max(200)
       .refine(value => !/[\x00-\x1f\x7f]/.test(value))
-      .refine(value => !value.startsWith('-'), 'Title must not start with -')
       .optional(),
     ...execution,
   }),

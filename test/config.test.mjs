@@ -85,10 +85,18 @@ test('strict tool schemas reject project selectors and unsupported flags', () =>
     { prompt: 'x\0y' }, { request_id: 'not-a-uuid' }, { arbitrary_flags: '--yes' },
     { base_branch: '../secret' }, { base_branch: 'main; rm -rf /' }, { base_branch: 'main~1' },
     { prompt: '한'.repeat(20_000) },
-    { title: '--machine=local' }, { title: '-lead' }, { title: ' --machine=local' }, { title: '-' },
   ]) assert.equal(schemas.thread_spawn.safeParse({ ...base, ...patch }).success, false, JSON.stringify(patch).slice(0, 150));
   assert(schemas.thread_spawn.safeParse({ ...base, github_repo: 'owner/repo', prompt: '--help', base_branch: 'feature/safe' }).success);
   assert(schemas.thread_spawn.safeParse({ ...base, provider: 'pi', model: 'openai-codex/gpt-6.1-sol' }).success);
-  assert.equal(schemas.thread_spawn.parse({ ...base, title: ' note --machine=local ' }).title, 'note --machine=local');
   assert.equal(schemas.thread_get.safeParse({ thread_id: 'thr_test', event_limit: 101 }).success, false);
+});
+
+test('spawn title validation permits leading dashes while retaining text limits', () => {
+  const base = { prompt: 'hello', request_id: '7de7f6e0-8149-4a5b-b9c5-8b06882ab320' };
+  for (const title of ['--machine=local', '-lead', '-', '- TODO', '--help 사용법', 'note --machine=local', 'x'.repeat(200)]) {
+    assert.equal(schemas.thread_spawn.parse({ ...base, title: `  ${title}  ` }).title, title);
+  }
+  for (const title of ['', '   ', 'x'.repeat(201), 'x\0y', 'x\ny', 'x\ty', 'x\x7fy']) {
+    assert.equal(schemas.thread_spawn.safeParse({ ...base, title }).success, false, JSON.stringify(title));
+  }
 });
