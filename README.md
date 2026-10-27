@@ -4,6 +4,8 @@
 
 **Version 0.1.0 — initial release.** Distributed through GitHub; not published to npm.
 
+Licensed under the [MIT License](LICENSE).
+
 A **Cloud-only stdio MCP server** wrapping `room-cli`. Local Pi/Devin clients submit
 instructions and inspect results; agents and workspaces run on Cloudroom Cloud VMs.
 

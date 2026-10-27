@@ -4,6 +4,8 @@
 
 **버전 0.1.0 — 첫 릴리즈.** GitHub으로 배포하며 npm에는 게시하지 않습니다.
 
+[MIT 라이선스](LICENSE)로 배포합니다.
+
 `room-cli`를 감싸는 **Cloud 전용 stdio MCP 서버**. 로컬 Pi/Devin은 지시·조회만 하고,
 실제 에이전트와 작업 공간은 Cloudroom Cloud VM에서 실행됩니다.
 

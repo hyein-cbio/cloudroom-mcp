@@ -1,6 +1,7 @@
 {
   "name": "cloudroom-mcp",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "Cloud-only stdio MCP gateway for room-cli",
