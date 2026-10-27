@@ -72,7 +72,8 @@ export function createService(config, run, { withLock = createLocks(config), reg
           '--reasoning-level', selected.reasoning_level, '--request-id', input.request_id,
           '--prompt=' + input.prompt, '--json'];
         if (baseBranch !== null) args.push('--base-branch', baseBranch);
-        if (input.title) args.push('--title', input.title);
+        // One argv entry, same as --prompt=: a title such as --machine=local stays a value.
+        if (input.title) args.push('--title=' + input.title);
         const thread = await run(args, { signal, mutating: true });
         if (!record(thread) || !/^thr_[A-Za-z0-9_-]+$/.test(thread.id ?? '') ||
             thread.executionTarget !== 'cloud' || thread.projectId !== resolved.projectId || thread.providerId !== selected.provider) {

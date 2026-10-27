@@ -85,8 +85,10 @@ test('strict tool schemas reject project selectors and unsupported flags', () =>
     { prompt: 'x\0y' }, { request_id: 'not-a-uuid' }, { arbitrary_flags: '--yes' },
     { base_branch: '../secret' }, { base_branch: 'main; rm -rf /' }, { base_branch: 'main~1' },
     { prompt: '한'.repeat(20_000) },
+    { title: '--machine=local' }, { title: '-lead' }, { title: ' --machine=local' }, { title: '-' },
   ]) assert.equal(schemas.thread_spawn.safeParse({ ...base, ...patch }).success, false, JSON.stringify(patch).slice(0, 150));
   assert(schemas.thread_spawn.safeParse({ ...base, github_repo: 'owner/repo', prompt: '--help', base_branch: 'feature/safe' }).success);
   assert(schemas.thread_spawn.safeParse({ ...base, provider: 'pi', model: 'openai-codex/gpt-6.1-sol' }).success);
+  assert.equal(schemas.thread_spawn.parse({ ...base, title: ' note --machine=local ' }).title, 'note --machine=local');
   assert.equal(schemas.thread_get.safeParse({ thread_id: 'thr_test', event_limit: 101 }).success, false);
 });
