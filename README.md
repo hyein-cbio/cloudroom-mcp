@@ -366,17 +366,47 @@ Local execution and local source synchronization are deferred features.
 
 ## Verification
 
+GitHub Actions invokes Modal for every push, same-repository pull request, or manual run.
+The GitHub-hosted runner only checks out the commit and calls Modal; Node.js checks and tests run
+in a Modal container, not on the GitHub runner. Modal installs dependencies with `npm ci --include=dev`
+in a cached Node.js 22 image, then runs `npm run check` and `npm test`. Any failed build or command fails CI.
+No GPU, Cloudroom credentials, real room-cli, or live Cloudroom services are required. Modal usage can incur costs.
+Dependency auditing remains a separate manual check.
+
+Before enabling CI, add `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` as repository Actions secrets,
+or organization Actions secrets with access granted to this repository. Missing credentials fail the job
+with a setup error. Fork pull requests are skipped because they cannot access these secrets;
+do not use `pull_request_target` to execute untrusted PR code with credentials. Only trusted changes
+should run this workflow, since the checked-out Python CI definition executes with the Modal token.
+
+To run the same remote check manually from the repository root:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r ci/requirements.txt
+modal setup
+modal run ci/modal_ci.py::run_tests
+```
+
+Use Python 3.11 for parity with CI. `modal setup` is interactive local authentication only;
+GitHub Actions uses the token secrets instead. The first run builds the image. Later runs reuse
+dependency layers when unchanged. Only `package.json`, `package-lock.json`, `server.mjs`, `src/`,
+and `test/` are explicitly uploaded as test inputs, not local `.env`, `.git`, or `node_modules/`.
+
+For local verification without Modal:
+
 ```bash
 npm run check
 npm test
 npm audit --omit=dev
 ```
 
-Tests use a fake room-cli and **do not automatically create paid Cloud workloads**.
+Tests use a fake room-cli and **do not automatically create paid Cloudroom workloads**.
 They cover argv/context isolation, strict GitHub identifiers, repository lookup/registration and allowlists, settings update ordering,
 errors/timeouts/cancellation, redirect refusal, prevention of automatic duplicate retries, locks, event pagination,
 a real stdio MCP client, and the legacy handshake. Registration integration tests use a local mock HTTP server, not the real Cloudroom API.
 
 A live Cloud read was verified through MCP client → server → room-cli during the initial implementation.
 The GitHub registration path is validated with a mock HTTP server, not a live registration POST.
-Implementation verification does not create remote workloads or modify real projects/threads.
+Implementation verification does not create Cloudroom workloads or modify real Cloudroom projects/threads.

@@ -359,17 +359,49 @@ Personal에는 저장소와 branch가 필요 없습니다. 저장소 프로젝�
 
 ## 검증
 
+GitHub Actions는 push, 동일 저장소의 pull request, 수동 실행 시 Modal을 호출합니다.
+GitHub runner는 해당 커밋을 checkout하고 Modal을 호출하는 역할만 맡으며, Node.js 검사와 테스트는
+GitHub가 아닌 Modal 컨테이너에서 실행됩니다. Node.js 22 이미지 빌드 단계에서
+`npm ci --include=dev`로 의존성을 설치·캐시하고, 실행 시 `npm run check`와 `npm test`를 수행합니다.
+빌드나 명령 하나라도 실패하면 CI가 실패합니다. GPU, Cloudroom 인증 정보, 실제 room-cli나
+Cloudroom 서비스는 필요하지 않습니다. Modal 사용 비용은 발생할 수 있습니다.
+의존성 보안 감사는 별도의 수동 검사로 유지합니다.
+
+CI를 사용하기 전에 저장소 Actions secrets에 `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`을 등록하거나,
+이 저장소에 접근을 허용한 organization Actions secrets를 설정합니다. 토큰이 없으면 설정 오류로 실패합니다.
+외부 fork PR은 secrets에 접근할 수 없어 건너뜁니다. 이를 우회하기 위해 `pull_request_target`에서
+신뢰하지 않는 PR 코드를 인증 정보와 함께 실행하면 안 됩니다. checkout한 Python CI 정의가 Modal 토큰에
+접근할 수 있으므로, 이 workflow는 신뢰할 수 있는 변경에만 실행해야 합니다.
+
+저장소 루트에서 같은 원격 검사를 직접 실행하려면:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r ci/requirements.txt
+modal setup
+modal run ci/modal_ci.py::run_tests
+```
+
+CI와 동일한 환경에는 Python 3.11을 사용합니다. `modal setup`은 로컬 대화형 인증용이며,
+GitHub Actions는 대신 secrets의 토큰을 사용합니다. 첫 실행은 이미지를 빌드하고, 이후에는
+변경되지 않은 의존성 레이어를 재사용합니다. 테스트 입력으로 명시적으로 업로드하는 파일은
+`package.json`, `package-lock.json`, `server.mjs`, `src/`, `test/`뿐입니다.
+로컬 `.env`, `.git`, `node_modules/`는 업로드하지 않습니다.
+
+Modal 없이 로컬에서 검증하려면:
+
 ```bash
 npm run check
 npm test
 npm audit --omit=dev
 ```
 
-테스트는 fake room-cli를 사용하며 **유료 Cloud 작업을 자동 생성하지 않습니다.**
+테스트는 fake room-cli를 사용하며 **유료 Cloudroom 작업을 자동 생성하지 않습니다.**
 argv/문맥 분리, 엄격한 GitHub 식별자, 저장소 조회·등록과 허용 목록, 설정 변경 순서,
 오류/타임아웃/취소, redirect 차단, 중복 자동 재시도 방지, 잠금, 이벤트 pagination,
 실제 stdio MCP client와 legacy handshake를 검증합니다. 등록 통합 테스트는 실제 Cloudroom API 대신 로컬 가짜 HTTP 서버를 사용합니다.
 
 초기 구현에서는 실제 Cloud 조회를 MCP client → server → room-cli 경로로 확인했습니다.
 GitHub 등록 경로는 실제 등록 POST 대신 가짜 HTTP 서버로 검증합니다.
-구현 검증을 위해 실제 프로젝트·스레드를 변경하거나 새 원격 작업을 실행하지 않습니다.
+구현 검증을 위해 실제 Cloudroom 프로젝트·스레드를 변경하거나 새 Cloudroom 작업을 실행하지 않습니다.
