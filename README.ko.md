@@ -359,7 +359,8 @@ Personal에는 저장소와 branch가 필요 없습니다. 저장소 프로젝�
 
 ## 검증
 
-GitHub Actions는 push, 동일 저장소의 pull request, 수동 실행 시 Modal을 호출합니다.
+GitHub Actions는 `main` push(PR 병합 포함), 동일 저장소의 pull request, 수동 실행 시 Modal을 호출합니다.
+다른 브랜치나 태그의 push는 실행 조건이 아니며, PR은 대상 브랜치와 관계없이 실행됩니다.
 GitHub runner는 해당 커밋을 checkout하고 Modal을 호출하는 역할만 맡으며, Node.js 검사와 테스트는
 GitHub가 아닌 Modal 컨테이너에서 실행됩니다. Node.js 22 이미지 빌드 단계에서
 `npm ci --include=dev`로 의존성을 설치·캐시하고, 실행 시 `npm run check`와 `npm test`를 수행합니다.

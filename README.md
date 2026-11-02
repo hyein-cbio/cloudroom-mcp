@@ -366,7 +366,8 @@ Local execution and local source synchronization are deferred features.
 
 ## Verification
 
-GitHub Actions invokes Modal for every push, same-repository pull request, or manual run.
+GitHub Actions invokes Modal for pushes to `main` (including PR merges), same-repository pull requests, or manual runs.
+Pushes to other branches or tags do not trigger this workflow; pull requests still trigger it regardless of the target branch.
 The GitHub-hosted runner only checks out the commit and calls Modal; Node.js checks and tests run
 in a Modal container, not on the GitHub runner. Modal installs dependencies with `npm ci --include=dev`
 in a cached Node.js 22 image, then runs `npm run check` and `npm test`. Any failed build or command fails CI.
