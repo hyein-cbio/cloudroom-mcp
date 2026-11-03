@@ -10,9 +10,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Check and test on Modal (Node.js 22)
+    name: Check and test in one Modal app (Node.js 22)
     # Fork PRs cannot access the tokens; never use pull_request_target to bypass this.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -33,7 +37,8 @@ jobs:
       - name: Install Modal SDK
         run: python -m pip install -r ci/requirements.txt
 
-      - name: Run checks and tests on Modal
+      # One invocation owns the app; Python dispatches both containers in parallel.
+      - name: Run parallel checks and tests in one Modal app
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}

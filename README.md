@@ -369,8 +369,13 @@ Local execution and local source synchronization are deferred features.
 GitHub Actions invokes Modal for pushes to `main` (including PR merges), same-repository pull requests, or manual runs.
 Pushes to other branches or tags do not trigger this workflow; pull requests still trigger it regardless of the target branch.
 The GitHub-hosted runner only checks out the commit and calls Modal; Node.js checks and tests run
-in a Modal container, not on the GitHub runner. Modal installs dependencies with `npm ci --include=dev`
-in a cached Node.js 22 image, then runs `npm run check` and `npm test`. Any failed build or command fails CI.
+in Modal containers, not on the GitHub runner. Each workflow invokes `modal run` once to create
+one ephemeral app; checks and tests run in parallel in separate containers within that app.
+Both use a cached Node.js 22 image with dependencies installed by `npm ci --include=dev`.
+The check task runs the Python CI regression tests and `npm run check`; the test task runs `npm test`.
+Both tasks finish even if one fails, and any failed build or task fails CI. New parallel tasks should
+share this dispatcher/app rather than create a separate app per task. Superseded runs on the same ref are cancelled.
+
 No GPU, Cloudroom credentials, real room-cli, or live Cloudroom services are required. Modal usage can incur costs.
 Dependency auditing remains a separate manual check.
 
@@ -393,7 +398,9 @@ modal run ci/modal_ci.py::run_tests
 Use Python 3.11 for parity with CI. `modal setup` is interactive local authentication only;
 GitHub Actions uses the token secrets instead. The first run builds the image. Later runs reuse
 dependency layers when unchanged. Only `package.json`, `package-lock.json`, `server.mjs`, `src/`,
-and `test/` are explicitly uploaded as test inputs, not local `.env`, `.git`, or `node_modules/`.
+`test/`, `ci/modal_ci.py`, and `ci/test_modal_ci.py` are explicitly uploaded as test inputs,
+not local `.env`, `.git`, or `node_modules/`. To test the dispatcher offline after installing
+`ci/requirements.txt`, run `python -m unittest discover -s ci -p 'test_*.py'`; this starts no Modal app.
 
 For local verification without Modal:
 

@@ -362,9 +362,15 @@ Personal에는 저장소와 branch가 필요 없습니다. 저장소 프로젝�
 GitHub Actions는 `main` push(PR 병합 포함), 동일 저장소의 pull request, 수동 실행 시 Modal을 호출합니다.
 다른 브랜치나 태그의 push는 실행 조건이 아니며, PR은 대상 브랜치와 관계없이 실행됩니다.
 GitHub runner는 해당 커밋을 checkout하고 Modal을 호출하는 역할만 맡으며, Node.js 검사와 테스트는
-GitHub가 아닌 Modal 컨테이너에서 실행됩니다. Node.js 22 이미지 빌드 단계에서
-`npm ci --include=dev`로 의존성을 설치·캐시하고, 실행 시 `npm run check`와 `npm test`를 수행합니다.
-빌드나 명령 하나라도 실패하면 CI가 실패합니다. GPU, Cloudroom 인증 정보, 실제 room-cli나
+GitHub가 아닌 Modal 컨테이너에서 실행됩니다. 워크플로마다 `modal run`을 한 번만 호출해
+임시 앱 하나를 만들고, 그 안의 별도 컨테이너에서 검사와 테스트를 병렬 실행합니다.
+두 작업은 `npm ci --include=dev`로 의존성을 설치·캐시한 Node.js 22 이미지를 사용합니다.
+검사 작업은 Python CI 회귀 테스트와 `npm run check`, 테스트 작업은 `npm test`를 수행합니다.
+한 작업이 실패해도 나머지는 끝까지 실행하며, 빌드나 작업 하나라도 실패하면 CI가 실패합니다.
+병렬 작업을 추가할 때도 작업마다 앱을 만들지 않고 이 디스패처와 앱을 공유하는 방식을 기본으로 합니다.
+같은 ref에서 새 실행이 시작되면 이전 실행은 취소합니다.
+
+GPU, Cloudroom 인증 정보, 실제 room-cli나
 Cloudroom 서비스는 필요하지 않습니다. Modal 사용 비용은 발생할 수 있습니다.
 의존성 보안 감사는 별도의 수동 검사로 유지합니다.
 
@@ -387,8 +393,10 @@ modal run ci/modal_ci.py::run_tests
 CI와 동일한 환경에는 Python 3.11을 사용합니다. `modal setup`은 로컬 대화형 인증용이며,
 GitHub Actions는 대신 secrets의 토큰을 사용합니다. 첫 실행은 이미지를 빌드하고, 이후에는
 변경되지 않은 의존성 레이어를 재사용합니다. 테스트 입력으로 명시적으로 업로드하는 파일은
-`package.json`, `package-lock.json`, `server.mjs`, `src/`, `test/`뿐입니다.
-로컬 `.env`, `.git`, `node_modules/`는 업로드하지 않습니다.
+`package.json`, `package-lock.json`, `server.mjs`, `src/`, `test/`,
+`ci/modal_ci.py`, `ci/test_modal_ci.py`뿐입니다. 로컬 `.env`, `.git`, `node_modules/`는 업로드하지 않습니다.
+`ci/requirements.txt` 설치 후 `python -m unittest discover -s ci -p 'test_*.py'`로
+디스패처를 오프라인 검증할 수 있으며, 이 명령은 Modal 앱을 생성하지 않습니다.
 
 Modal 없이 로컬에서 검증하려면:
 
