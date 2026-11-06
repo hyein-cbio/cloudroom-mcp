@@ -15,6 +15,7 @@ app = modal.App("cloudroom-mcp-ci")
 def make_image():
     image = (
         modal.Image.from_registry("node:22-bookworm-slim", add_python="3.11")
+        .apt_install("git")
         .env({"CI": "true"})
         .workdir(WORKSPACE)
     )
@@ -39,6 +40,7 @@ def make_image():
         .add_local_file(ROOT / "server.mjs", f"{WORKSPACE}/server.mjs")
         .add_local_dir(ROOT / "src", f"{WORKSPACE}/src")
         .add_local_dir(ROOT / "test", f"{WORKSPACE}/test")
+        .add_local_file(ROOT / "ci/npm_release_helpers.mjs", f"{WORKSPACE}/ci/npm_release_helpers.mjs")
         .add_local_file(ROOT / "ci/modal_ci.py", f"{WORKSPACE}/ci/modal_ci.py")
         .add_local_file(ROOT / "ci/test_modal_ci.py", f"{WORKSPACE}/ci/test_modal_ci.py")
     )

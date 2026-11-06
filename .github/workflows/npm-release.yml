@@ -1,0 +1,40 @@
+name: Published npm verification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/npm-release.yml'
+      - 'ci/verify_npm_release.mjs'
+      - 'ci/npm_release_helpers.mjs'
+      - 'test/npm-release.test.mjs'
+      - 'test/fixtures/release-mcp.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Registry 0.1.1 / Node 22
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect and exercise published package without Cloudroom authentication
+        env:
+          RELEASE_REPORT_DIR: ${{ runner.temp }}/npm-release-report
+        run: node ci/verify_npm_release.mjs
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-release-verification
+          path: ${{ runner.temp }}/npm-release-report/report.json
+          if-no-files-found: error
+          retention-days: 30

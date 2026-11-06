@@ -65,7 +65,7 @@ class ModalCITests(unittest.TestCase):
 
     def mock_image(self):
         image = MagicMock()
-        for method in ("env", "workdir", "add_local_file", "add_local_dir", "run_commands"):
+        for method in ("apt_install", "env", "workdir", "add_local_file", "add_local_dir", "run_commands"):
             getattr(image, method).return_value = image
         return image
 
@@ -75,6 +75,7 @@ class ModalCITests(unittest.TestCase):
             with patch.object(ci.modal.Image, "from_registry", return_value=image) as registry:
                 self.assertIs(ci.make_image(), image)
         registry.assert_called_once_with("node:22-bookworm-slim", add_python="3.11")
+        image.apt_install.assert_called_once_with("git")
         image.env.assert_called_once_with({"CI": "true"})
         image.workdir.assert_called_once_with("/workspace")
         files = {
@@ -85,7 +86,7 @@ class ModalCITests(unittest.TestCase):
             "package.json", "package-lock.json", "server.mjs",
             "README.md", "README.ko.md", "LICENSE", "CHANGELOG.md",
             ".env.example", "mcp.example.json",
-            "ci/modal_ci.py", "ci/test_modal_ci.py",
+            "ci/npm_release_helpers.mjs", "ci/modal_ci.py", "ci/test_modal_ci.py",
         })
         for path, call in files.items():
             self.assertEqual(call.args[1], f"/workspace/{path}")
