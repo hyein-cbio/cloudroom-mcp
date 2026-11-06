@@ -83,6 +83,8 @@ class ModalCITests(unittest.TestCase):
         }
         self.assertEqual(set(files), {
             "package.json", "package-lock.json", "server.mjs",
+            "README.md", "README.ko.md", "LICENSE", "CHANGELOG.md",
+            ".env.example", "mcp.example.json",
             "ci/modal_ci.py", "ci/test_modal_ci.py",
         })
         for path, call in files.items():

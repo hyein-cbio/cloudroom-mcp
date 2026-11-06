@@ -2,7 +2,7 @@
 
 [English](README.md) | [한국어](README.ko.md)
 
-**Version 0.1.0 — initial release.** Distributed through GitHub; not published to npm.
+**Version 0.1.1.** Available on [npm](https://www.npmjs.com/package/cloudroom-mcp) and [GitHub Releases](https://github.com/hyein-cbio/cloudroom-mcp/releases). See [CHANGELOG.md](CHANGELOG.md).
 
 Licensed under the [MIT License](LICENSE).
 
@@ -18,12 +18,42 @@ instructions and inspect results; agents and workspaces run on Cloudroom Cloud V
 ## Upstream project
 
 Cloudroom and `room-cli`: [davidondrej/cloudroom-core](https://github.com/davidondrej/cloudroom-core).
-This repository is a separate MCP adapter that invokes `room-cli`. GitHub-only project registration uses one internal Cloudroom HTTP endpoint because the CLI does not expose that operation.
+This repository is an unofficial, independent MCP adapter that invokes `room-cli`; it is not maintained or endorsed by the Cloudroom project. GitHub-only project registration uses one internal Cloudroom HTTP endpoint because the CLI does not expose that operation.
 
 ## Install and run
 
+Install Node.js 22+ and Cloudroom first. Start Cloudroom's local control server and configure Cloud/provider authentication.
+**npm installs this adapter only**, not Cloudroom, `room-cli`, provider CLIs, or their credentials.
+
+For an MCP client using `mcpServers`, merge this version-pinned entry into its settings:
+
+```json
+{
+  "mcpServers": {
+    "room": {
+      "command": "npx",
+      "args": ["--yes", "cloudroom-mcp@0.1.1"]
+    }
+  }
+}
+```
+
+The client launches the server; no clone or global installation is needed. `npx` needs registry access on first use.
+Use an absolute `npx` path if your GUI client cannot find it. Upgrade by explicitly changing the pinned version.
+Pass options through the entry's `env` object; see [Defaults and options](#defaults-and-options).
+The CLI is expected at `~/.local/bin/room-cli`; set `CLOUDROOM_CLI_PATH` to its absolute path otherwise.
+
+To start it manually (it waits for MCP input):
+
 ```bash
-cd ~/orca/projects/cloudroom-mcp
+npx --yes cloudroom-mcp@0.1.1
+```
+
+Alternatively, install from source:
+
+```bash
+git clone https://github.com/hyein-cbio/cloudroom-mcp.git
+cd cloudroom-mcp
 npm ci
 node server.mjs
 ```
@@ -42,7 +72,17 @@ CLOUDROOM_ALLOWED_GITHUB_REPOS=owner/repository
 ```
 
 Or set `CLOUDROOM_GITHUB_REPO=owner/repository` to make that repository the default and automatically allow it.
-No local clone, machine source connection, project ID lookup, or manual project creation is needed.
+No local clone, machine source connection, or project ID lookup is needed. Missing-project registration may require setup in the trusted Cloudroom app; see [Compatibility and prerequisites](#compatibility-and-prerequisites).
+
+## Compatibility and prerequisites
+
+- Node.js **22+**; automated CI uses Node.js 22 on Linux. The release packaging and live checks also run on macOS.
+- Release validation uses **Cloudroom 142.0.0 / room-cli v142**. This is a tested version, not a promise that all earlier or later versions work.
+- The local control server must be running, Cloud must be ready, and the selected provider must be authenticated. Use `room-cli --version` and `room-cli cloud status --json` to inspect your setup.
+- GitHub-backed tasks additionally need Cloudroom GitHub access. Only pushed remote content is available, not uncommitted local files.
+- **Known v142 limitation:** automatic registration of a missing GitHub project may be refused with `caller_proof_required`. This adapter does not forge caller proof. Register the repository yourself in the trusted Cloudroom app first, then retry with the same spawn UUID and inputs after inspecting projects. Existing matching projects avoid the registration endpoint; Personal does not need it.
+- The GitHub registration endpoint is internal and may change; recheck compatibility when updating Cloudroom. Do not use this adapter with an untrusted local control server.
+- The default `acp-devin` / `gpt-6-1-sol-high` / `high` is a previously tested author preset, **not a universally available model**. Set `CLOUDROOM_DEFAULT_PROVIDER`, `CLOUDROOM_DEFAULT_MODEL`, and `CLOUDROOM_DEFAULT_REASONING_LEVEL` together for your account. Model availability is controlled upstream.
 
 ## Defaults and options
 
@@ -106,6 +146,7 @@ For a GitHub repository, the server:
 4. Verifies that the returned project's GitHub remote matches, then supplies its internal ID to Cloud `thread spawn`.
 
 The registration endpoint is internal and may change between Cloudroom versions. It can create a remote-only project or reuse/unhide an existing one.
+On v142, a host caller-proof requirement can block this POST. The server returns `github_registration_requires_approval` with guidance; it never adds proof headers, changes permissions, retries, or falls back to Personal. Register the repository yourself through the trusted Cloudroom app, inspect the resulting projects, and only then resubmit the same spawn UUID and inputs.
 No `project create --root`, `project source add`, or local clone/attachment command is used.
 `repository_registration_used` reports whether the HTTP registration path was needed, not whether a new project was definitely created.
 Registration success is not proof that Cloud can access/clone the repository; inspect later thread errors as well.
@@ -216,6 +257,9 @@ Do not blindly empty the directory or delete a live process's lock.
 
 ## Add to a coding agent's MCP configuration
 
+The npm configuration in [Install and run](#install-and-run) is the recommended path.
+The following is the **source-checkout alternative**, useful for development or offline runtime after dependency installation.
+
 ### 1. Install the server dependencies
 
 In your local clone of this repository:
@@ -296,12 +340,12 @@ Discovery alone does not create a Cloud task.
 This is an external MCP server, not a Pi extension/package. Use Pi's built-in MCP support;
 `pi install` is not needed for this repository.
 
-### 1. Install dependencies and register
+### 1. Register the npm executable
 
-Run `npm ci` in the server repository once, as shown above. For Personal-only use:
+For Personal-only use:
 
 ```bash
-pi mcp add room --exposure direct -- node /absolute/path/to/cloudroom-mcp/server.mjs
+pi mcp add room --exposure direct -- npx --yes cloudroom-mcp@0.1.1
 pi mcp list
 pi
 ```
@@ -316,13 +360,13 @@ To allow a GitHub repository while keeping Personal as the default, use this reg
 ```bash
 pi mcp add room --exposure direct \
   --env CLOUDROOM_ALLOWED_GITHUB_REPOS=owner/repository \
-  -- node /absolute/path/to/cloudroom-mcp/server.mjs
+  -- npx --yes cloudroom-mcp@0.1.1
 pi mcp list
 ```
 
 To make that repository the default, use `--env CLOUDROOM_GITHUB_REPO=owner/repository` instead.
 `--env` is repeatable for other server settings.
-You can also pass `--env-file=/absolute/path/to/cloudroom-mcp/.env` after `node` and before the script path.
+For the source-checkout alternative, run `npm ci` once and replace `npx --yes cloudroom-mcp@0.1.1` with `node /absolute/path/to/cloudroom-mcp/server.mjs`. In that form, you can pass `--env-file=/absolute/path/to/cloudroom-mcp/.env` after `node` and before the script path.
 
 ### 2. Check an existing Pi session
 
@@ -341,7 +385,7 @@ Pi exposes their names as `mcp__room__thread_spawn`, `mcp__room__thread_tell`,
 ### 3. Manual or project-local configuration
 
 Alternatively, merge the Pi-specific entry from `mcp.example.json` into `~/.pi/agent/mcp.json`,
-replace the server path, and run `/reload`. That sample includes Pi's `exposure: "direct"` and a 60-second `timeout`.
+adjust its environment if needed, and run `/reload`. That sample includes Pi's `exposure: "direct"` and a 60-second `timeout`.
 
 For project-local registration, run `pi mcp add room --local ...` from the **coding project's directory**.
 This writes `.pi/mcp.json` there, not in the MCP server's installation directory.
@@ -349,7 +393,8 @@ Pi loads project-local MCP configuration only after the coding project is truste
 
 ### Troubleshooting
 
-- `node` not found: use an absolute Node executable path in the registration.
+- `npx` or `node` not found: use the relevant executable's absolute path in the registration.
+- `github_registration_requires_approval`: Cloudroom rejected the internal registration POST. Register the repository yourself in the trusted Cloudroom app, inspect projects, and resubmit the same spawn UUID and inputs. Do not bypass caller-proof checks.
 - `room-cli` not found/not executable: set `CLOUDROOM_CLI_PATH` to the actual absolute executable path.
 - Cannot reach Cloudroom: start its local control server and check `CLOUDROOM_SERVER_URL`.
 - `repository_not_allowed`: configure `CLOUDROOM_ALLOWED_GITHUB_REPOS` or `CLOUDROOM_GITHUB_REPO`, then reload.
@@ -398,7 +443,7 @@ modal run ci/modal_ci.py::run_tests
 Use Python 3.11 for parity with CI. `modal setup` is interactive local authentication only;
 GitHub Actions uses the token secrets instead. The first run builds the image. Later runs reuse
 dependency layers when unchanged. Only `package.json`, `package-lock.json`, `server.mjs`, `src/`,
-`test/`, `ci/modal_ci.py`, and `ci/test_modal_ci.py` are explicitly uploaded as test inputs,
+`test/`, the public package documents/examples (`README.md`, `README.ko.md`, `LICENSE`, `CHANGELOG.md`, `.env.example`, `mcp.example.json`), `ci/modal_ci.py`, and `ci/test_modal_ci.py` are explicitly uploaded as test inputs,
 not local `.env`, `.git`, or `node_modules/`. To test the dispatcher offline after installing
 `ci/requirements.txt`, run `python -m unittest discover -s ci -p 'test_*.py'`; this starts no Modal app.
 
@@ -410,11 +455,14 @@ npm test
 npm audit --omit=dev
 ```
 
-Tests use a fake room-cli and **do not automatically create paid Cloudroom workloads**.
+Tests use a fake room-cli and **do not automatically create paid Cloudroom workloads**. Packaging regression tests verify the executable metadata, version consistency, and an exact public-file allowlist, including exclusion of local index DBs, credentials, and development files.
 They cover argv/context isolation, strict GitHub identifiers, repository lookup/registration and allowlists, settings update ordering,
 errors/timeouts/cancellation, redirect refusal, prevention of automatic duplicate retries, locks, event pagination,
 a real stdio MCP client, and the legacy handshake. Registration integration tests use a local mock HTTP server, not the real Cloudroom API.
 
-A live Cloud read was verified through MCP client → server → room-cli during the initial implementation.
-The GitHub registration path is validated with a mock HTTP server, not a live registration POST.
-Implementation verification does not create Cloudroom workloads or modify real Cloudroom projects/threads.
+### 0.1.1 release validation (2026-11-06)
+
+- A packed tarball was installed with production dependencies in a clean temporary directory, without a source checkout at runtime. Its installed executable completed the four-tool flow against a fake room-cli.
+- A separately authorized, paid-capable live smoke test on macOS / Node.js 26.13.0 / Cloudroom 142.0.0 / room-cli v142 used Personal with `codex`, `gpt-6.1-sol`, and `low`. Creation, unique-marker responses, a follow-up, incremental events including `turn/completed`, and stop all succeeded through the installed package's MCP executable. Stop does not delete the VM or thread. This does not validate the default Devin preset on v142.
+- A real GitHub registration POST was attempted and refused with HTTP 401 `caller_proof_required`; no Cloud thread was created for that GitHub request. Successful live registration/clone remains **unverified**. Success paths and the explicit caller-proof rejection are covered by mocks; no proof bypass or automatic fallback is implemented.
+- Ordinary `npm test` and CI remain offline with respect to Cloudroom: they never create paid Cloud tasks. Live tests are an explicit release-maintainer action, not part of installation or the default test suite.

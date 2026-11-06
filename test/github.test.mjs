@@ -49,6 +49,29 @@ test('HTTP failures and malformed success responses never retry or silently fall
   }
 });
 
+test('caller-proof rejection reports required approval without forging proof or retrying', async t => {
+  const config = await tempConfig(t);
+  let calls = 0;
+  const register = createGithubRegistration(config, async (_url, options) => {
+    calls++;
+    assert.deepEqual(Object.keys(options.headers).sort(), ['Accept', 'Content-Type']);
+    return Response.json({ code: 'caller_proof_required' }, { status: 401 });
+  });
+  await assert.rejects(register('owner/test'), error => {
+    assert.equal(error.code, 'github_registration_requires_approval');
+    assert.equal(error.details.http_status, 401);
+    assert.equal(error.details.phase, 'repository_registration');
+    assert.match(error.details.guidance, /trusted Cloudroom app/);
+    assert.match(error.details.guidance, /same spawn UUID/);
+    return true;
+  });
+  assert.equal(calls, 1);
+  for (const body of ['not JSON', JSON.stringify({ code: 'other' })]) {
+    const generic = createGithubRegistration(config, async () => new Response(body, { status: 401 }));
+    await assert.rejects(generic('owner/test'), { code: 'github_registration_failed' });
+  }
+});
+
 test('oversized registration output is bounded and reported as an uncertain mutation', async t => {
   const register = createGithubRegistration(await tempConfig(t), async () => new Response('x'.repeat(70_000)));
   await assert.rejects(register('owner/test'), error =>

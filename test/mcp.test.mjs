@@ -38,6 +38,8 @@ test('real stdio MCP client discovers exactly four tools and drives the full flo
   const client = new Client({ name: 'cloudroom-mcp-test', version: '1.0.0' });
   t.after(() => client.close());
   await client.connect(transport);
+  const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+  assert.equal(client.getServerVersion().version, manifest.version);
   assert.deepEqual((await client.listTools()).tools.map(tool => tool.name).sort(),
     ['thread_get', 'thread_spawn', 'thread_stop', 'thread_tell']);
   const call = async (name, args) => {

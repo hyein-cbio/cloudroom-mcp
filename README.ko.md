@@ -2,7 +2,7 @@
 
 [English](README.md) | [한국어](README.ko.md)
 
-**버전 0.1.0 — 첫 릴리즈.** GitHub으로 배포하며 npm에는 게시하지 않습니다.
+**버전 0.1.1.** [npm](https://www.npmjs.com/package/cloudroom-mcp)과 [GitHub Releases](https://github.com/hyein-cbio/cloudroom-mcp/releases)로 배포합니다. 변경 사항은 [CHANGELOG.md](CHANGELOG.md)를 참고하세요.
 
 [MIT 라이선스](LICENSE)로 배포합니다.
 
@@ -18,12 +18,42 @@
 ## 원본 프로젝트
 
 Cloudroom과 `room-cli` 저장소: [davidondrej/cloudroom-core](https://github.com/davidondrej/cloudroom-core).
-이 저장소는 `room-cli`를 호출하는 별도의 MCP 어댑터입니다. CLI에 없는 GitHub 전용 프로젝트 등록만 Cloudroom 내부 HTTP API로 처리합니다.
+이 저장소는 `room-cli`를 호출하는 독립적인 비공식 MCP 어댑터이며, Cloudroom 프로젝트가 관리하거나 보증하지 않습니다. CLI에 없는 GitHub 전용 프로젝트 등록만 Cloudroom 내부 HTTP API로 처리합니다.
 
 ## 설치 및 실행
 
+먼저 Node.js 22+와 Cloudroom을 설치하고, 로컬 제어 서버를 실행한 뒤 Cloud/provider 인증을 준비하세요.
+**npm은 이 어댑터만 설치**합니다. Cloudroom·`room-cli`·provider CLI나 인증 정보는 설치하지 않습니다.
+
+`mcpServers` 형식의 클라이언트에서는 다음 버전 고정 entry를 기존 설정에 병합합니다:
+
+```json
+{
+  "mcpServers": {
+    "room": {
+      "command": "npx",
+      "args": ["--yes", "cloudroom-mcp@0.1.1"]
+    }
+  }
+}
+```
+
+클라이언트가 서버를 실행하므로 clone이나 전역 설치가 필요 없습니다. `npx`는 첫 실행 시 npm 레지스트리에 접근해야 합니다.
+GUI에서 찾지 못하면 `npx` 절대 경로를 사용하세요. 업데이트는 고정 버전을 명시적으로 바꾸는 방식입니다.
+옵션은 entry의 `env`로 전달합니다([기본값과 옵션](#기본값과-옵션) 참고).
+CLI 기본 경로는 `~/.local/bin/room-cli`이며, 다르면 `CLOUDROOM_CLI_PATH`에 실제 절대 경로를 설정하세요.
+
+직접 시작하려면(MCP 입력을 기다립니다):
+
 ```bash
-cd ~/orca/projects/cloudroom-mcp
+npx --yes cloudroom-mcp@0.1.1
+```
+
+소스에서 설치하는 방법도 지원합니다:
+
+```bash
+git clone https://github.com/hyein-cbio/cloudroom-mcp.git
+cd cloudroom-mcp
 npm ci
 node server.mjs
 ```
@@ -42,7 +72,17 @@ CLOUDROOM_ALLOWED_GITHUB_REPOS=owner/repository
 ```
 
 또는 `CLOUDROOM_GITHUB_REPO=owner/repository`으로 기본 저장소를 지정하면 해당 저장소도 자동으로 허용됩니다.
-로컬 clone·머신 source 연결·프로젝트 ID 조회·수동 프로젝트 생성은 필요 없습니다.
+로컬 clone·머신 source 연결·프로젝트 ID 조회는 필요 없습니다. 없는 프로젝트의 등록은 신뢰하는 Cloudroom 앱에서 먼저 준비해야 할 수 있습니다([호환성과 사전 준비](#호환성과-사전-준비) 참고).
+
+## 호환성과 사전 준비
+
+- Node.js **22+**. 자동 CI는 Linux의 Node.js 22를 사용하며, 릴리즈 패키징과 실제 Cloud 검증은 macOS에서도 수행합니다.
+- 릴리즈 검증 환경은 **Cloudroom 142.0.0 / room-cli v142**입니다. 확인한 버전이며, 모든 이전·이후 버전의 동작을 보장하는 최소 버전 표기는 아닙니다.
+- 로컬 제어 서버 실행, Cloud 준비, 선택한 provider의 인증이 필요합니다. `room-cli --version`, `room-cli cloud status --json`으로 확인하세요.
+- GitHub 작업에는 Cloudroom의 GitHub 접근 권한도 필요합니다. push된 원격 소스만 사용할 수 있고 로컬 미커밋 파일은 전달되지 않습니다.
+- **v142의 알려진 제한:** 아직 없는 GitHub 프로젝트의 자동 등록이 `caller_proof_required`로 거부될 수 있습니다. 이 어댑터는 caller proof를 위조하지 않습니다. 사용자가 신뢰하는 Cloudroom 앱에서 저장소를 먼저 등록하고 프로젝트를 확인한 뒤 같은 spawn UUID·입력으로 다시 요청하세요. 일치하는 기존 프로젝트는 등록 API를 쓰지 않으며 Personal에도 필요 없습니다.
+- GitHub 등록은 변경 가능한 내부 API를 사용하므로 Cloudroom 업데이트 후 호환성을 다시 확인하세요. 신뢰하지 않는 로컬 제어 서버에는 연결하지 마세요.
+- 기본 `acp-devin` / `gpt-6-1-sol-high` / `high`는 이전에 검증한 작성자 환경의 프리셋이며 **모든 계정에서 사용 가능한 모델이 아닙니다**. 계정에 맞게 `CLOUDROOM_DEFAULT_PROVIDER`·`CLOUDROOM_DEFAULT_MODEL`·`CLOUDROOM_DEFAULT_REASONING_LEVEL`을 함께 설정하세요. 모델 제공 여부는 업스트림이 결정합니다.
 
 ## 기본값과 옵션
 
@@ -105,6 +145,7 @@ GitHub 저장소를 지정하면 서버가 다음 순서로 처리합니다:
 4. 반환된 프로젝트의 GitHub remote를 재확인한 뒤 내부 ID를 Cloud `thread spawn`에 전달합니다.
 
 등록 endpoint는 내부 API이므로 Cloudroom 버전에 따라 바뀔 수 있습니다. 로컬 source 없는 프로젝트를 생성하거나 기존 프로젝트를 재사용·숨김 해제할 수 있습니다.
+v142에서는 호스트 caller proof 요구로 POST가 차단될 수 있습니다. 서버는 안내와 함께 `github_registration_requires_approval`을 반환하며, proof 헤더 추가·권한 변경·자동 재시도·Personal fallback을 하지 않습니다. 사용자가 신뢰하는 Cloudroom 앱에서 저장소를 직접 등록하고 프로젝트를 확인한 뒤에만 같은 spawn UUID·입력으로 다시 요청하세요.
 `project create --root`, `project source add`, 로컬 clone·연결 명령은 호출하지 않습니다.
 `repository_registration_used`는 HTTP 등록 경로를 사용했는지를 뜻하며, 반드시 새 프로젝트가 생성되었다는 뜻은 아닙니다.
 등록 성공이 Cloud의 저장소 접근·clone 성공까지 보장하지는 않으므로 이후 스레드 오류도 확인해야 합니다.
@@ -209,6 +250,9 @@ Pi/Devin 양쪽에서 같은 경로를 사용하세요. 필요하면 절대 경�
 
 ## 일반 코딩 에이전트의 MCP 설정에 추가
 
+[설치 및 실행](#설치-및-실행)의 npm 설정을 권장합니다.
+아래는 개발하거나 의존성 설치 후 오프라인에서 실행할 때 쓸 수 있는 **소스 checkout 방식**입니다.
+
 ### 1. 서버 의존성 설치
 
 이 저장소를 로컬에 clone한 디렉터리에서 실행합니다:
@@ -289,12 +333,12 @@ Personal을 기본값으로 유지하면서 저장소를 허용하려면 `room` 
 이 저장소는 Pi 확장/패키지가 아니라 외부 MCP 서버입니다. Pi 내장 MCP 기능으로 등록하며,
 이 저장소에 대해 `pi install`을 실행할 필요는 없습니다.
 
-### 1. 의존성 설치 및 등록
+### 1. npm 실행 파일 등록
 
-위 안내대로 서버 저장소에서 `npm ci`를 한 번 실행합니다. Personal만 사용하려면:
+Personal만 사용하려면:
 
 ```bash
-pi mcp add room --exposure direct -- node /absolute/path/to/cloudroom-mcp/server.mjs
+pi mcp add room --exposure direct -- npx --yes cloudroom-mcp@0.1.1
 pi mcp list
 pi
 ```
@@ -309,13 +353,13 @@ Personal을 기본값으로 유지하면서 GitHub 저장소를 허용하려면 
 ```bash
 pi mcp add room --exposure direct \
   --env CLOUDROOM_ALLOWED_GITHUB_REPOS=owner/repository \
-  -- node /absolute/path/to/cloudroom-mcp/server.mjs
+  -- npx --yes cloudroom-mcp@0.1.1
 pi mcp list
 ```
 
 해당 저장소를 기본값으로 쓰려면 대신 `--env CLOUDROOM_GITHUB_REPO=owner/repository`를 지정합니다.
 다른 서버 설정도 반복 가능한 `--env`로 전달할 수 있습니다.
-.env 파일을 쓸 때는 `node` 다음, 스크립트 경로 앞에 `--env-file=/absolute/path/to/cloudroom-mcp/.env`를 넣어도 됩니다.
+소스 checkout 방식에서는 `npm ci`를 한 번 실행한 뒤 `npx --yes cloudroom-mcp@0.1.1` 대신 `node /absolute/path/to/cloudroom-mcp/server.mjs`를 사용하세요. 이 방식으로 .env 파일을 쓸 때는 `node` 다음, 스크립트 경로 앞에 `--env-file=/absolute/path/to/cloudroom-mcp/.env`를 넣어도 됩니다.
 
 ### 2. 기존 Pi 세션에서 확인
 
@@ -334,7 +378,7 @@ Pi에서는 이름에 prefix가 붙어 `mcp__room__thread_spawn`, `mcp__room__th
 ### 3. 직접 편집 또는 프로젝트별 설정
 
 직접 설정하려면 Pi 전용 `mcp.example.json` entry를 `~/.pi/agent/mcp.json`에 병합하고
-서버 경로를 바꾼 뒤 `/reload`하세요. 샘플에는 Pi의 `exposure: "direct"`와 60초 `timeout`이 포함되어 있습니다.
+필요한 환경 변수를 조정한 뒤 `/reload`하세요. 샘플에는 Pi의 `exposure: "direct"`와 60초 `timeout`이 포함되어 있습니다.
 
 프로젝트별 등록은 **작업할 코딩 프로젝트 디렉터리에서** `pi mcp add room --local ...`로 실행합니다.
 설정은 MCP 서버 설치 디렉터리가 아니라 그 작업 프로젝트의 `.pi/mcp.json`에 저장됩니다.
@@ -342,7 +386,8 @@ Pi에서는 이름에 prefix가 붙어 `mcp__room__thread_spawn`, `mcp__room__th
 
 ### 문제 해결
 
-- `node`를 찾지 못함: 등록 명령의 Node 실행 파일을 절대 경로로 지정하세요.
+- `npx` 또는 `node`를 찾지 못함: 등록 명령에서 해당 실행 파일을 절대 경로로 지정하세요.
+- `github_registration_requires_approval`: Cloudroom이 내부 등록 POST를 거부했습니다. 신뢰하는 Cloudroom 앱에서 저장소를 직접 등록하고 프로젝트를 확인한 뒤 같은 spawn UUID·입력으로 다시 요청하세요. caller proof 검증을 우회하지 마세요.
 - `room-cli`가 없거나 실행 불가: 실제 실행 파일의 절대 경로를 `CLOUDROOM_CLI_PATH`로 설정하세요.
 - Cloudroom에 연결할 수 없음: 로컬 제어 서버를 실행하고 `CLOUDROOM_SERVER_URL`을 확인하세요.
 - `repository_not_allowed`: `CLOUDROOM_ALLOWED_GITHUB_REPOS` 또는 `CLOUDROOM_GITHUB_REPO`를 설정하고 새로고침하세요.
@@ -394,6 +439,7 @@ CI와 동일한 환경에는 Python 3.11을 사용합니다. `modal setup`은 �
 GitHub Actions는 대신 secrets의 토큰을 사용합니다. 첫 실행은 이미지를 빌드하고, 이후에는
 변경되지 않은 의존성 레이어를 재사용합니다. 테스트 입력으로 명시적으로 업로드하는 파일은
 `package.json`, `package-lock.json`, `server.mjs`, `src/`, `test/`,
+공개 패키지 문서·예제(`README.md`, `README.ko.md`, `LICENSE`, `CHANGELOG.md`, `.env.example`, `mcp.example.json`),
 `ci/modal_ci.py`, `ci/test_modal_ci.py`뿐입니다. 로컬 `.env`, `.git`, `node_modules/`는 업로드하지 않습니다.
 `ci/requirements.txt` 설치 후 `python -m unittest discover -s ci -p 'test_*.py'`로
 디스패처를 오프라인 검증할 수 있으며, 이 명령은 Modal 앱을 생성하지 않습니다.
@@ -406,11 +452,14 @@ npm test
 npm audit --omit=dev
 ```
 
-테스트는 fake room-cli를 사용하며 **유료 Cloudroom 작업을 자동 생성하지 않습니다.**
+테스트는 fake room-cli를 사용하며 **유료 Cloudroom 작업을 자동 생성하지 않습니다.** 패키징 회귀 테스트는 실행 파일 메타데이터·버전 일치·정확한 공개 파일 목록을 검사하고, 로컬 인덱스 DB·인증 정보·개발 파일의 포함을 차단합니다.
 argv/문맥 분리, 엄격한 GitHub 식별자, 저장소 조회·등록과 허용 목록, 설정 변경 순서,
 오류/타임아웃/취소, redirect 차단, 중복 자동 재시도 방지, 잠금, 이벤트 pagination,
 실제 stdio MCP client와 legacy handshake를 검증합니다. 등록 통합 테스트는 실제 Cloudroom API 대신 로컬 가짜 HTTP 서버를 사용합니다.
 
-초기 구현에서는 실제 Cloud 조회를 MCP client → server → room-cli 경로로 확인했습니다.
-GitHub 등록 경로는 실제 등록 POST 대신 가짜 HTTP 서버로 검증합니다.
-구현 검증을 위해 실제 Cloudroom 프로젝트·스레드를 변경하거나 새 Cloudroom 작업을 실행하지 않습니다.
+### 0.1.1 릴리즈 검증 (2026-11-06)
+
+- tarball을 깨끗한 임시 디렉터리에 프로덕션 의존성만으로 설치하고, 실행 시 소스 checkout에 의존하지 않는 설치 실행 파일로 fake room-cli의 네 도구 흐름을 확인했습니다.
+- 별도로 승인된 실제 Cloud 검증은 macOS / Node.js 26.13.0 / Cloudroom 142.0.0 / room-cli v142에서 Personal과 `codex`·`gpt-6.1-sol`·`low`를 사용했습니다. 설치 패키지의 MCP 실행 파일을 통해 생성, 고유 표식 응답, 추가 지시, `turn/completed`를 포함한 이벤트 조회, 중지가 모두 성공했습니다. 중지는 VM·스레드 삭제가 아니며, 이 결과가 v142의 기본 Devin 프리셋을 검증한 것은 아닙니다.
+- 실제 GitHub 등록 POST는 HTTP 401 `caller_proof_required`로 거부됐고, 해당 요청으로 Cloud 스레드는 생성되지 않았습니다. 등록·clone의 실제 성공은 **미검증**입니다. 성공 경로와 caller proof 거부 처리는 mock으로 검증하며, proof 우회나 자동 fallback은 구현하지 않습니다.
+- 일반 `npm test`와 CI는 Cloudroom 작업을 만들지 않습니다. 비용이 발생할 수 있는 실제 Cloud 검증은 설치나 기본 테스트에 포함하지 않고 릴리즈 담당자가 명시적으로 수행합니다.

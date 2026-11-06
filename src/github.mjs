@@ -52,6 +52,16 @@ export function createGithubRegistration(config, fetchImpl = globalThis.fetch) {
         body: JSON.stringify({ repo }), signal: requestSignal, redirect: 'error', credentials: 'omit',
       });
       const body = await boundedBody(response);
+      if (response.status === 401) {
+        let rejection;
+        try { rejection = JSON.parse(body); } catch { /* Non-JSON failures keep the generic HTTP error. */ }
+        if (rejection?.code === 'caller_proof_required') {
+          throw new GatewayError('github_registration_requires_approval',
+            'Cloudroom refused GitHub registration because host caller approval is required. No retry or fallback was attempted.',
+            { http_status: 401, outcome_unknown: true,
+              guidance: 'Register the repository in the trusted Cloudroom app yourself, then inspect projects before resubmitting the same spawn UUID and inputs. This adapter does not supply caller proof or bypass sandbox access controls.' });
+        }
+      }
       if (!response.ok) {
         throw new GatewayError('github_registration_failed',
           'Cloudroom GitHub registration returned HTTP ' + response.status + ': ' + body.slice(0, 2_000),
@@ -69,7 +79,7 @@ export function createGithubRegistration(config, fetchImpl = globalThis.fetch) {
         requestSignal.aborted ? (requestSignal.reason?.name === 'TimeoutError' ? 'timeout' : 'cancelled') : 'github_registration_failed',
         'Cloudroom GitHub registration failed: ' + error.message, { outcome_unknown: true });
       failure.details = { ...failure.details, phase: 'repository_registration', github_repo: repo,
-        guidance: 'No automatic retry. Inspect Cloudroom projects before resubmitting an uncertain registration. No local checkout fallback.' };
+        guidance: failure.details.guidance ?? 'No automatic retry. Inspect Cloudroom projects before resubmitting an uncertain registration. No local checkout fallback.' };
       throw failure;
     }
   };

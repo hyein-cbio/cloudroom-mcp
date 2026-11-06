@@ -23,11 +23,19 @@ def make_image():
         return image
     # Cache dependencies separately from source. Never upload .env, .git,
     # local node_modules, or credentials; both tasks share this image definition.
-    return (
+    image = (
         image
         .add_local_file(ROOT / "package.json", f"{WORKSPACE}/package.json", copy=True)
         .add_local_file(ROOT / "package-lock.json", f"{WORKSPACE}/package-lock.json", copy=True)
         .run_commands("npm ci --include=dev")
+    )
+    for name in (
+        "README.md", "README.ko.md", "LICENSE", "CHANGELOG.md",
+        ".env.example", "mcp.example.json",
+    ):
+        image = image.add_local_file(ROOT / name, f"{WORKSPACE}/{name}")
+    return (
+        image
         .add_local_file(ROOT / "server.mjs", f"{WORKSPACE}/server.mjs")
         .add_local_dir(ROOT / "src", f"{WORKSPACE}/src")
         .add_local_dir(ROOT / "test", f"{WORKSPACE}/test")
