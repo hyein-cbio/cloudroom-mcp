@@ -174,7 +174,7 @@ try {
   const consumer = join(stage, 'consumer');
   await mkdir(consumer);
   await writeFile(join(consumer, 'package.json'), JSON.stringify({ name: 'release-consumer', version: '1.0.0', private: true }));
-  await command('npm', ['install', tarball, '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund',
+  await command('npm', ['install', tarball, '--omit=dev', '--no-audit', '--no-fund',
     '--registry', registry, '--cache', join(stage, 'install-cache')], consumer);
   report.dependencyTree = JSON.parse((await command('npm', ['ls', '--all', '--omit=dev', '--json'], consumer)).stdout);
   const installed = join(consumer, 'node_modules', 'cloudroom-mcp');
@@ -201,12 +201,18 @@ try {
   // A separate cold cache exercises npx without local package resolution.
   const npxCwd = join(stage, 'npx-consumer');
   await mkdir(npxCwd);
-  report.npxProtocol = await handshake('npx', ['--yes', '--ignore-scripts', '--loglevel=error',
-    '--registry=' + registry, '--cache=' + join(stage, 'npx-cache'), spec], npxCwd, extraEnv);
-  pass('cold-cache npx initializes and lists exactly four tools (lifecycle scripts disabled)');
+  report.npxProtocol = await handshake('npx', ['--yes', spec], npxCwd, {
+    ...extraEnv, npm_config_cache: join(stage, 'npx-cache'), npm_config_loglevel: 'error',
+  });
+  pass('documented npx --yes cloudroom-mcp@0.1.1 initializes from a cold cache with normal lifecycle behavior');
   await assert.rejects(readFile(marker), { code: 'ENOENT' });
   pass('sentinel never executed; no Cloudroom CLI calls, credentials, registration or remote threads');
   report.status = 'passed';
+  console.log('EVIDENCE ' + JSON.stringify({
+    checkedAt: report.checkedAt, node: report.node, tarball: report.tarball,
+    gitHead: metadata.gitHead, dependencies: manifest.dependencies,
+    files: report.files, dependencyTree: report.dependencyTree,
+  }));
 } catch (error) {
   report.status = 'failed';
   report.error = { message: error.message, stack: error.stack };
