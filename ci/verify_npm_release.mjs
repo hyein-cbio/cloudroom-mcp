@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createInterface } from 'node:readline';
+import { handshake, readReleaseFiles } from './npm_release_helpers.mjs';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
@@ -40,83 +40,6 @@ async function npm(args, cache = 'cache') {
 }
 function pass(name) { report.checks.push(name); console.log('PASS ' + name); }
 
-async function handshake(commandName, args, cwd, extraEnv) {
-  const child = spawn(commandName, args, { cwd, env: { ...env, ...extraEnv }, stdio: ['pipe', 'pipe', 'pipe'] });
-  let stderr = '';
-  let protocolError;
-  const pending = new Map();
-  let nextId = 0;
-  const rejectPending = error => {
-    protocolError ||= error;
-    for (const item of pending.values()) { clearTimeout(item.timer); item.reject(error); }
-    pending.clear();
-  };
-  child.on('error', rejectPending);
-  child.stderr.on('data', chunk => { stderr += chunk; });
-  const exited = new Promise(resolveExit => child.once('close', (code, signal) => {
-    rejectPending(new Error('MCP process closed: ' + code + '/' + signal));
-    resolveExit({ code, signal });
-  }));
-  const lines = createInterface({ input: child.stdout });
-  lines.on('line', line => {
-    try {
-      const message = JSON.parse(line);
-      assert.equal(message.jsonrpc, '2.0');
-      assert(message.id !== undefined || typeof message.method === 'string', 'Unexpected stdout message');
-      if (message.id !== undefined) {
-        const item = pending.get(message.id);
-        assert(item, 'Unsolicited response ID');
-        clearTimeout(item.timer);
-        pending.delete(message.id);
-        item.resolve(message);
-      }
-    } catch (error) { rejectPending(error); }
-  });
-  function rpc(method, params = {}) {
-    if (protocolError) return Promise.reject(protocolError);
-    const id = ++nextId;
-    return new Promise((resolveRequest, reject) => {
-      const timer = setTimeout(() => { pending.delete(id); reject(new Error('MCP timeout: ' + method)); }, 45_000);
-      pending.set(id, { resolve: resolveRequest, reject, timer });
-      child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
-    });
-  }
-  try {
-    const init = await rpc('initialize', {
-      protocolVersion: '2025-11-25', capabilities: {},
-      clientInfo: { name: 'npm-release-check', version: '1' },
-    });
-    assert(!init.error, JSON.stringify(init));
-    assert.equal(init.result.protocolVersion, '2025-11-25');
-    assert.equal(init.result.serverInfo.name, 'cloudroom-mcp');
-    assert.equal(init.result.serverInfo.version, version);
-    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
-    const listed = await rpc('tools/list');
-    assert(!listed.error, JSON.stringify(listed));
-    assert.deepEqual(listed.result.tools.map(tool => tool.name).sort(),
-      ['thread_get', 'thread_spawn', 'thread_stop', 'thread_tell']);
-    for (const tool of listed.result.tools) {
-      assert.equal(tool.inputSchema.type, 'object');
-      assert(tool.description.length > 0);
-      assert.equal(tool.annotations.readOnlyHint, tool.name === 'thread_get');
-    }
-    const ping = await rpc('ping');
-    assert.deepEqual(ping.result, {});
-    const unknown = await rpc('release-check/unknown');
-    assert.equal(unknown.error.code, -32601);
-    assert(!protocolError, String(protocolError));
-    return { initialize: init.result, tools: listed.result.tools, ping: ping.result, unknownMethodCode: unknown.error.code };
-  } finally {
-    child.stdin.end();
-    const timer = setTimeout(() => child.kill('SIGKILL'), 5_000);
-    const status = await exited;
-    clearTimeout(timer);
-    lines.close();
-    assert.equal(status.code, 0, JSON.stringify(status));
-    assert.equal(stderr, '', 'Unexpected MCP stderr: ' + stderr.slice(0, 1000));
-  }
-}
-
 try {
   const metadata = JSON.parse((await npm(['view', spec, '--json'])).stdout);
   assert.equal(metadata.name, 'cloudroom-mcp');
@@ -133,9 +56,8 @@ try {
   report.tarball = { bytes: bytes.length, integrity: sha512 };
   pass('actual registry tarball integrity matches npm metadata');
 
-  const sources = (await readdir(join(root, 'src'))).filter(name => name.endsWith('.mjs')).map(name => 'src/' + name);
-  const expected = ['package.json', 'server.mjs', ...sources,
-    'README.md', 'README.ko.md', 'LICENSE', 'CHANGELOG.md', '.env.example', 'mcp.example.json'].sort();
+  const releaseFiles = await readReleaseFiles(root, report.releaseCommit);
+  const expected = [...releaseFiles.keys()];
   const paths = (await command('tar', ['-tzf', tarball])).stdout.trim().split('\n');
   assert.equal(new Set(paths).size, paths.length, 'Duplicate archive paths');
   assert.deepEqual(paths.map(path => {
@@ -162,7 +84,7 @@ try {
   assert((await readFile(join(pkg, 'server.mjs'), 'utf8')).startsWith('#!/usr/bin/env node\n'));
   for (const path of expected) {
     const actual = await readFile(join(pkg, path));
-    const source = await readFile(join(root, path));
+    const source = releaseFiles.get(path);
     if (path === 'package.json') assert.deepEqual(JSON.parse(actual), JSON.parse(source), path);
     else assert.deepEqual(actual, source, 'Published/source byte mismatch: ' + path);
     assert(!/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|npm_[A-Za-z0-9]{30,})/.test(actual.toString('utf8')),
@@ -195,15 +117,15 @@ try {
     JSON.stringify(marker) + ', "unexpected CLI execution");\nprocess.exit(97);\n');
   await chmod(sentinel, 0o755);
   const extraEnv = { CLOUDROOM_CLI_PATH: sentinel, CLOUDROOM_LOCK_DIR: join(stage, 'locks') };
-  report.installedProtocol = await handshake(bin, [], consumer, extraEnv);
+  report.installedProtocol = await handshake(bin, [], consumer, { ...env, ...extraEnv }, version);
   pass('installed bin: initialize, initialized notification, four schemas, ping, JSON-RPC error and EOF exit');
 
   // A separate cold cache exercises npx without local package resolution.
   const npxCwd = join(stage, 'npx-consumer');
   await mkdir(npxCwd);
   report.npxProtocol = await handshake('npx', ['--yes', spec], npxCwd, {
-    ...extraEnv, npm_config_cache: join(stage, 'npx-cache'), npm_config_loglevel: 'error',
-  });
+    ...env, ...extraEnv, npm_config_cache: join(stage, 'npx-cache'), npm_config_loglevel: 'error',
+  }, version);
   pass('documented npx --yes cloudroom-mcp@0.1.1 initializes from a cold cache with normal lifecycle behavior');
   await assert.rejects(readFile(marker), { code: 'ENOENT' });
   pass('sentinel never executed; no Cloudroom CLI calls, credentials, registration or remote threads');
