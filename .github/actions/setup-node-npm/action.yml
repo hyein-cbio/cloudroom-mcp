@@ -1,0 +1,34 @@
+name: Set up Node.js and npm
+description: Select a Node.js version and use its bundled npm or a registry release
+inputs:
+  node-version:
+    description: Node.js version or range
+    required: true
+  npm:
+    description: npm major version, latest, or bundled
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        check-latest: true
+        package-manager-cache: false
+    - name: Select and verify npm and npx
+      shell: bash
+      env:
+        NPM_SPEC: ${{ inputs.npm }}
+      run: |
+        if [[ "$NPM_SPEC" != bundled ]]; then
+          npm install --global --engine-strict --ignore-scripts --no-audit --no-fund \
+            --registry=https://registry.npmjs.org "npm@$NPM_SPEC"
+        fi
+        node --version
+        npm_version=$(npm --version)
+        echo "npm $npm_version"
+        test "$(npx --version)" = "$npm_version"
+        case "$NPM_SPEC" in
+          bundled|latest) ;;
+          *) [[ "$npm_version" == "$NPM_SPEC".* ]] ;;
+        esac

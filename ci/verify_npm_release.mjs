@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { handshake, readReleaseFiles } from './npm_release_helpers.mjs';
+import { handshake, parseNpmPackResult, parseNpmViewResult, readReleaseFiles } from './npm_release_helpers.mjs';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
@@ -41,13 +41,15 @@ async function npm(args, cache = 'cache') {
 function pass(name) { report.checks.push(name); console.log('PASS ' + name); }
 
 try {
-  const metadata = JSON.parse((await npm(['view', spec, '--json'])).stdout);
+  report.npm = (await command('npm', ['--version'])).stdout.trim();
+  const metadata = parseNpmViewResult((await npm(['view', spec, '--json'])).stdout);
   assert.equal(metadata.name, 'cloudroom-mcp');
   assert.equal(metadata.version, version);
   assert.equal(metadata.dist.tarball, registry + 'cloudroom-mcp/-/cloudroom-mcp-' + version + '.tgz');
   if (metadata.gitHead) assert.equal(metadata.gitHead, report.releaseCommit);
   report.registry = { dist: metadata.dist, gitHead: metadata.gitHead, dependencies: metadata.dependencies };
-  const [packed] = JSON.parse((await npm(['pack', spec, '--json', '--ignore-scripts'])).stdout);
+  const { stdout: packOutput } = await npm(['pack', spec, '--json', '--ignore-scripts']);
+  const packed = parseNpmPackResult(packOutput, 'cloudroom-mcp', version);
   const tarball = join(stage, packed.filename);
   const bytes = await readFile(tarball);
   const sha512 = 'sha512-' + createHash('sha512').update(bytes).digest('base64');
@@ -99,9 +101,10 @@ try {
   await command('npm', ['install', tarball, '--omit=dev', '--no-audit', '--no-fund',
     '--registry', registry, '--cache', join(stage, 'install-cache')], consumer);
   report.dependencyTree = JSON.parse((await command('npm', ['ls', '--all', '--omit=dev', '--json'], consumer)).stdout);
-  const installed = join(consumer, 'node_modules', 'cloudroom-mcp');
   const bin = join(consumer, 'node_modules', '.bin', 'cloudroom-mcp');
-  assert.equal(await realpath(bin), join(installed, 'server.mjs'));
+  // macOS may expose the temporary directory under /var and /private/var.
+  const expectedBin = join(await realpath(consumer), 'node_modules', 'cloudroom-mcp', 'server.mjs');
+  assert.equal(await realpath(bin), expectedBin);
   pass('isolated consumer production install and complete dependency tree; npm bin resolves to server.mjs');
 
   const missing = await command(bin, [], consumer).then(
@@ -131,7 +134,7 @@ try {
   pass('sentinel never executed; no Cloudroom CLI calls, credentials, registration or remote threads');
   report.status = 'passed';
   console.log('EVIDENCE ' + JSON.stringify({
-    checkedAt: report.checkedAt, node: report.node, tarball: report.tarball,
+    checkedAt: report.checkedAt, node: report.node, npm: report.npm, tarball: report.tarball,
     gitHead: metadata.gitHead, dependencies: manifest.dependencies,
     files: report.files, dependencyTree: report.dependencyTree,
   }));

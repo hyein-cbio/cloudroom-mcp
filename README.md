@@ -76,7 +76,7 @@ No local clone, machine source connection, or project ID lookup is needed. Missi
 
 ## Compatibility and prerequisites
 
-- Node.js **22+**; automated CI uses Node.js 22 on Linux. The release packaging and live checks also run on macOS.
+- Node.js **22+**; CI tests Node.js 22, 24, and 26 across Linux and macOS. Live Cloudroom validation is separate.
 - Release validation uses **Cloudroom 142.0.0 / room-cli v142**. This is a tested version, not a promise that all earlier or later versions work.
 - The local control server must be running, Cloud must be ready, and the selected provider must be authenticated. Use `room-cli --version` and `room-cli cloud status --json` to inspect your setup.
 - GitHub-backed tasks additionally need Cloudroom GitHub access. Only pushed remote content is available, not uncommitted local files.
@@ -411,11 +411,16 @@ Local execution and local source synchronization are deferred features.
 
 ## Verification
 
-GitHub Actions invokes Modal for pushes to `main` (including PR merges), same-repository pull requests, or manual runs.
-Pushes to other branches or tags do not trigger this workflow; pull requests still trigger it regardless of the target branch.
-The GitHub-hosted runner only checks out the commit and calls Modal; Node.js checks and tests run
-in Modal containers, not on the GitHub runner. Each workflow invokes `modal run` once to create
-one ephemeral app; checks and tests run in parallel in separate containers within that app.
+On pushes to `main`, pull requests (including forks), and manual runs, the GitHub-hosted compatibility matrix
+checks the source on Linux with Node.js 22.0.0 (bundled npm), 22.x (npm 10), 24.x (npm 11), and
+26.x (latest npm), and on macOS with Node.js 24.x (npm 12). Each job does a clean install and runs
+the full suite, including the current MCP SDK and legacy 2025-11-25 stdio handshake.
+The separate published-package workflow checks the actual registry tarball, installed bin, and `npx`
+on the npm 10/11/12/latest lanes, including both generations of npm JSON output. It runs weekly,
+on pull requests that change its verification inputs, or on demand. Neither matrix needs Modal credentials.
+
+The existing Modal job still runs on `main` pushes, same-repository pull requests, and manual runs.
+It invokes `modal run` once to create one ephemeral app; checks and tests run in parallel in separate containers within that app.
 Both use a cached Node.js 22 image with dependencies installed by `npm ci --include=dev`.
 The check task runs the Python CI regression tests and `npm run check`; the test task runs `npm test`.
 Both tasks finish even if one fails, and any failed build or task fails CI. New parallel tasks should
@@ -426,9 +431,9 @@ Dependency auditing remains a separate manual check.
 
 Before enabling CI, add `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` as repository Actions secrets,
 or organization Actions secrets with access granted to this repository. Missing credentials fail the job
-with a setup error. Fork pull requests are skipped because they cannot access these secrets;
+with a setup error. The Modal job skips fork pull requests because they cannot access these secrets;
 do not use `pull_request_target` to execute untrusted PR code with credentials. Only trusted changes
-should run this workflow, since the checked-out Python CI definition executes with the Modal token.
+should run this job, since the checked-out Python CI definition executes with the Modal token.
 
 To run the same remote check manually from the repository root:
 
@@ -443,7 +448,7 @@ modal run ci/modal_ci.py::run_tests
 Use Python 3.11 for parity with CI. `modal setup` is interactive local authentication only;
 GitHub Actions uses the token secrets instead. The first run builds the image. Later runs reuse
 dependency layers when unchanged. Only `package.json`, `package-lock.json`, `server.mjs`, `src/`,
-`test/`, the public package documents/examples (`README.md`, `README.ko.md`, `LICENSE`, `CHANGELOG.md`, `.env.example`, `mcp.example.json`), `ci/modal_ci.py`, and `ci/test_modal_ci.py` are explicitly uploaded as test inputs,
+`test/`, the public package documents/examples (`README.md`, `README.ko.md`, `LICENSE`, `CHANGELOG.md`, `.env.example`, `mcp.example.json`), `ci/npm_release_helpers.mjs`, `ci/modal_ci.py`, and `ci/test_modal_ci.py` are explicitly uploaded as test inputs,
 not local `.env`, `.git`, or `node_modules/`. To test the dispatcher offline after installing
 `ci/requirements.txt`, run `python -m unittest discover -s ci -p 'test_*.py'`; this starts no Modal app.
 

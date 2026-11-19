@@ -6,6 +6,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseNpmPackResult } from '../ci/npm_release_helpers.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
@@ -53,8 +54,7 @@ test('npm pack includes only runtime and public docs, never local indexes or cre
     'pack', '--dry-run', '--json', '--ignore-scripts', '--cache', join(stage, 'npm-cache')], {
     cwd: stage, timeout: 25_000, maxBuffer: 1_048_576,
   });
-  const [packed] = JSON.parse(stdout);
-  assert.equal(packed.version, manifest.version);
+  const packed = parseNpmPackResult(stdout, manifest.name, manifest.version);
   assert.deepEqual(packed.files.map(file => file.path).sort(), expected);
   assert(packed.unpackedSize < 250_000, 'Unexpected package growth: inspect the published file list');
 });

@@ -76,7 +76,7 @@ CLOUDROOM_ALLOWED_GITHUB_REPOS=owner/repository
 
 ## 호환성과 사전 준비
 
-- Node.js **22+**. 자동 CI는 Linux의 Node.js 22를 사용하며, 릴리즈 패키징과 실제 Cloud 검증은 macOS에서도 수행합니다.
+- Node.js **22+**. CI는 Linux와 macOS에서 Node.js 22·24·26을 검사합니다. 실제 Cloudroom 검증은 별도로 진행합니다.
 - 릴리즈 검증 환경은 **Cloudroom 142.0.0 / room-cli v142**입니다. 확인한 버전이며, 모든 이전·이후 버전의 동작을 보장하는 최소 버전 표기는 아닙니다.
 - 로컬 제어 서버 실행, Cloud 준비, 선택한 provider의 인증이 필요합니다. `room-cli --version`, `room-cli cloud status --json`으로 확인하세요.
 - GitHub 작업에는 Cloudroom의 GitHub 접근 권한도 필요합니다. push된 원격 소스만 사용할 수 있고 로컬 미커밋 파일은 전달되지 않습니다.
@@ -404,11 +404,16 @@ Personal에는 저장소와 branch가 필요 없습니다. 저장소 프로젝�
 
 ## 검증
 
-GitHub Actions는 `main` push(PR 병합 포함), 동일 저장소의 pull request, 수동 실행 시 Modal을 호출합니다.
-다른 브랜치나 태그의 push는 실행 조건이 아니며, PR은 대상 브랜치와 관계없이 실행됩니다.
-GitHub runner는 해당 커밋을 checkout하고 Modal을 호출하는 역할만 맡으며, Node.js 검사와 테스트는
-GitHub가 아닌 Modal 컨테이너에서 실행됩니다. 워크플로마다 `modal run`을 한 번만 호출해
-임시 앱 하나를 만들고, 그 안의 별도 컨테이너에서 검사와 테스트를 병렬 실행합니다.
+GitHub Actions 호환성 매트릭스는 `main` push, fork를 포함한 PR, 수동 실행에서 동작합니다.
+Linux에서는 Node.js 22.0.0(번들 npm), 22.x(npm 10), 24.x(npm 11), 26.x(최신 npm)를,
+macOS에서는 Node.js 24.x(npm 12)를 검사합니다. 각 조합에서 의존성을 새로 설치하고
+현재 MCP SDK와 기존 2025-11-25 stdio 연결을 포함한 전체 테스트를 실행합니다.
+별도의 공개 패키지 검증은 npm 10·11·12·최신 조합에서 레지스트리 tarball, 설치된 실행 파일,
+`npx`를 확인하며 npm JSON의 구형·신형 형식을 모두 검증합니다. 매주, 관련 파일 변경 PR,
+또는 수동으로 실행합니다. 두 매트릭스에는 Modal 인증 정보가 필요하지 않습니다.
+
+기존 Modal 작업은 `main` push, 동일 저장소 PR, 수동 실행에서 그대로 동작합니다.
+`modal run`을 한 번만 호출해 임시 앱 하나를 만들고, 별도 컨테이너에서 검사와 테스트를 병렬 실행합니다.
 두 작업은 `npm ci --include=dev`로 의존성을 설치·캐시한 Node.js 22 이미지를 사용합니다.
 검사 작업은 Python CI 회귀 테스트와 `npm run check`, 테스트 작업은 `npm test`를 수행합니다.
 한 작업이 실패해도 나머지는 끝까지 실행하며, 빌드나 작업 하나라도 실패하면 CI가 실패합니다.
@@ -421,9 +426,9 @@ Cloudroom 서비스는 필요하지 않습니다. Modal 사용 비용은 발생�
 
 CI를 사용하기 전에 저장소 Actions secrets에 `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`을 등록하거나,
 이 저장소에 접근을 허용한 organization Actions secrets를 설정합니다. 토큰이 없으면 설정 오류로 실패합니다.
-외부 fork PR은 secrets에 접근할 수 없어 건너뜁니다. 이를 우회하기 위해 `pull_request_target`에서
-신뢰하지 않는 PR 코드를 인증 정보와 함께 실행하면 안 됩니다. checkout한 Python CI 정의가 Modal 토큰에
-접근할 수 있으므로, 이 workflow는 신뢰할 수 있는 변경에만 실행해야 합니다.
+외부 fork PR은 secrets에 접근할 수 없어 Modal 작업만 건너뜁니다. 이를 우회하기 위해
+`pull_request_target`에서 신뢰하지 않는 PR 코드를 인증 정보와 함께 실행하면 안 됩니다.
+checkout한 Python CI 정의가 Modal 토큰에 접근할 수 있으므로, 이 작업은 신뢰할 수 있는 변경에만 실행해야 합니다.
 
 저장소 루트에서 같은 원격 검사를 직접 실행하려면:
 
@@ -440,7 +445,7 @@ GitHub Actions는 대신 secrets의 토큰을 사용합니다. 첫 실행은 이
 변경되지 않은 의존성 레이어를 재사용합니다. 테스트 입력으로 명시적으로 업로드하는 파일은
 `package.json`, `package-lock.json`, `server.mjs`, `src/`, `test/`,
 공개 패키지 문서·예제(`README.md`, `README.ko.md`, `LICENSE`, `CHANGELOG.md`, `.env.example`, `mcp.example.json`),
-`ci/modal_ci.py`, `ci/test_modal_ci.py`뿐입니다. 로컬 `.env`, `.git`, `node_modules/`는 업로드하지 않습니다.
+`ci/npm_release_helpers.mjs`, `ci/modal_ci.py`, `ci/test_modal_ci.py`뿐입니다. 로컬 `.env`, `.git`, `node_modules/`는 업로드하지 않습니다.
 `ci/requirements.txt` 설치 후 `python -m unittest discover -s ci -p 'test_*.py'`로
 디스패처를 오프라인 검증할 수 있으며, 이 명령은 Modal 앱을 생성하지 않습니다.
 

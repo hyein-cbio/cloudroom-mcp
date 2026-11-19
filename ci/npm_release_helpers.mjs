@@ -5,6 +5,25 @@ import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
 
+export function parseNpmViewResult(stdout) {
+  const result = JSON.parse(stdout);
+  // npm 12 wraps even an exact version match in an array.
+  if (!Array.isArray(result)) return result;
+  assert.equal(result.length, 1, 'Expected npm view to report exactly one version');
+  return result[0];
+}
+
+export function parseNpmPackResult(stdout, name, version) {
+  const result = JSON.parse(stdout);
+  // npm 12 switched from an array to an object keyed by package name.
+  assert(result && typeof result === 'object' && Object.keys(result).length === 1,
+    'Expected npm pack to report exactly one package');
+  const packed = Array.isArray(result) ? result[0] : result[name];
+  assert.equal(packed?.name, name, 'Unexpected npm pack package');
+  assert.equal(packed.version, version, 'Unexpected npm pack version');
+  return packed;
+}
+
 export async function readReleaseFiles(root, commit) {
   const git = args => exec('git', args, {
     cwd: root, encoding: 'buffer', timeout: 30_000, maxBuffer: 4 * 1024 * 1024,

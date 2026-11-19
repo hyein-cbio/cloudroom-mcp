@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { handshake, readReleaseFiles } from '../ci/npm_release_helpers.mjs';
+import { handshake, parseNpmPackResult, parseNpmViewResult, readReleaseFiles } from '../ci/npm_release_helpers.mjs';
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -24,6 +24,26 @@ async function repository(t) {
   await git(['init']);
   return { cwd, git };
 }
+
+test('npm view reads exactly one version in both legacy and npm 12 JSON', () => {
+  const metadata = { name: 'cloudroom-mcp', version: '0.1.1' };
+  const parse = value => parseNpmViewResult(JSON.stringify(value));
+  assert.deepEqual(parse(metadata), metadata);
+  assert.deepEqual(parse([metadata]), metadata);
+  assert.throws(() => parse([]), /exactly one version/);
+  assert.throws(() => parse([metadata, metadata]), /exactly one version/);
+});
+
+test('npm pack validates the package and version in both legacy and npm 12 JSON', () => {
+  const entry = { name: 'cloudroom-mcp', version: '0.1.1', filename: 'cloudroom-mcp-0.1.1.tgz' };
+  const parse = value => parseNpmPackResult(JSON.stringify(value), entry.name, entry.version);
+  assert.deepEqual(parse([entry]), entry);
+  assert.deepEqual(parse({ [entry.name]: entry }), entry);
+  assert.throws(() => parse([]), /exactly one package/);
+  assert.throws(() => parse([entry, entry]), /exactly one package/);
+  assert.throws(() => parse({ other: entry }), /Unexpected npm pack package/);
+  assert.throws(() => parse([{ ...entry, version: '0.1.0' }]), /Unexpected npm pack version/);
+});
 
 test('release allowlist and source bytes come from the release commit, not HEAD or working tree', { timeout: 20_000 }, async t => {
   const { cwd, git } = await repository(t);

@@ -4,37 +4,56 @@ on:
   pull_request:
     paths:
       - '.github/workflows/npm-release.yml'
+      - '.github/actions/setup-node-npm/action.yml'
       - 'ci/verify_npm_release.mjs'
       - 'ci/npm_release_helpers.mjs'
       - 'test/npm-release.test.mjs'
       - 'test/fixtures/release-mcp.mjs'
   workflow_dispatch:
+  schedule:
+    # Catch upstream npm/registry changes without invoking Modal.
+    - cron: '17 4 * * 1'
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    name: Registry 0.1.1 / Node 22
-    runs-on: ubuntu-latest
+    name: Registry 0.1.1 / Node ${{ matrix.node }} / npm ${{ matrix.npm }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: linux-npm10, os: ubuntu-latest, node: '22.x', npm: '10' }
+          - { id: linux-npm11, os: ubuntu-latest, node: '24.x', npm: '11' }
+          - { id: macos-npm12, os: macos-latest, node: '24.x', npm: '12' }
+          - { id: linux-npm-latest, os: ubuntu-latest, node: '26.x', npm: latest }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-node-npm
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node }}
+          npm: ${{ matrix.npm }}
       - name: Inspect and exercise published package without Cloudroom authentication
         env:
           RELEASE_REPORT_DIR: ${{ runner.temp }}/npm-release-report
-        run: node ci/verify_npm_release.mjs
+        run: |
+          # Exercise the same path aliasing as macOS's /var and /private/var.
+          scratch=$(mktemp -d)
+          trap 'rm -rf "$scratch"' EXIT
+          mkdir "$scratch/real"
+          ln -s "$scratch/real" "$scratch/alias"
+          TMPDIR="$scratch/alias" node ci/verify_npm_release.mjs
       - name: Retain verification evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: npm-release-verification
+          name: npm-release-verification-${{ matrix.id }}
           path: ${{ runner.temp }}/npm-release-report/report.json
           if-no-files-found: error
           retention-days: 30

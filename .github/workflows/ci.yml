@@ -15,6 +15,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  compatibility:
+    name: Node ${{ matrix.node }} / npm ${{ matrix.npm }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The advertised Node.js floor predates npm 11/12's Node.js requirements.
+          - { os: ubuntu-latest, node: '22.0.0', npm: bundled }
+          - { os: ubuntu-latest, node: '22.x', npm: '10' }
+          - { os: ubuntu-latest, node: '24.x', npm: '11' }
+          - { os: macos-latest, node: '24.x', npm: '12' }
+          - { os: ubuntu-latest, node: '26.x', npm: latest }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-npm
+        with:
+          node-version: ${{ matrix.node }}
+          npm: ${{ matrix.npm }}
+      - run: npm ci --include=dev --engine-strict --strict-peer-deps
+      - run: npm run check
+      - run: npm test
+
   test:
     name: Check and test in one Modal app (Node.js 22)
     # Fork PRs cannot access the tokens; never use pull_request_target to bypass this.
@@ -23,12 +49,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
           cache: pip
