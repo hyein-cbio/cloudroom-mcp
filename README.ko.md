@@ -82,7 +82,7 @@ CLOUDROOM_ALLOWED_GITHUB_REPOS=owner/repository
 - GitHub 작업에는 Cloudroom의 GitHub 접근 권한도 필요합니다. push된 원격 소스만 사용할 수 있고 로컬 미커밋 파일은 전달되지 않습니다.
 - **v142의 알려진 제한:** 아직 없는 GitHub 프로젝트의 자동 등록이 `caller_proof_required`로 거부될 수 있습니다. 이 어댑터는 caller proof를 위조하지 않습니다. 사용자가 신뢰하는 Cloudroom 앱에서 저장소를 먼저 등록하고 프로젝트를 확인한 뒤 같은 spawn UUID·입력으로 다시 요청하세요. 일치하는 기존 프로젝트는 등록 API를 쓰지 않으며 Personal에도 필요 없습니다.
 - GitHub 등록은 변경 가능한 내부 API를 사용하므로 Cloudroom 업데이트 후 호환성을 다시 확인하세요. 신뢰하지 않는 로컬 제어 서버에는 연결하지 마세요.
-- 기본 `acp-devin` / `gpt-6-1-sol-high` / `high`는 이전에 검증한 작성자 환경의 프리셋이며 **모든 계정에서 사용 가능한 모델이 아닙니다**. 계정에 맞게 `CLOUDROOM_DEFAULT_PROVIDER`·`CLOUDROOM_DEFAULT_MODEL`·`CLOUDROOM_DEFAULT_REASONING_LEVEL`을 함께 설정하세요. 모델 제공 여부는 업스트림이 결정합니다.
+- 현재 소스의 기본값은 Pi / OpenAI GPT-6.2 Sol / `high`입니다. **모든 계정에서 이 모델을 사용할 수 있는 것은 아닙니다.** 계정에 맞게 `CLOUDROOM_DEFAULT_PROVIDER`·`CLOUDROOM_DEFAULT_MODEL`·`CLOUDROOM_DEFAULT_REASONING_LEVEL`을 함께 설정하세요. 위에 고정한 npm 버전은 이 변경 전 릴리스이므로, 해당 버전에서 Pi 프리셋을 쓰려면 환경 변수 세 개를 명시하세요.
 
 ## 기본값과 옵션
 
@@ -90,8 +90,8 @@ CLOUDROOM_ALLOWED_GITHUB_REPOS=owner/repository
 |---|---|---|
 | machine | `cloud` | 현재 Cloud만 허용. Local/native 실행은 의도적으로 제외 |
 | base_branch | 생략 | 저장소 프로젝트에서만 spawn 입력 또는 `CLOUDROOM_DEFAULT_BASE_BRANCH`; Personal에는 전달하지 않음 |
-| provider | `acp-devin` | spawn/tell 입력 또는 `CLOUDROOM_DEFAULT_PROVIDER` |
-| model | `gpt-6-1-sol-high` | spawn/tell 입력 또는 `CLOUDROOM_DEFAULT_MODEL` |
+| provider (에이전트) | `pi` | spawn/tell 입력 또는 `CLOUDROOM_DEFAULT_PROVIDER` |
+| model | `openai/gpt-6.2-sol` | spawn/tell 입력 또는 `CLOUDROOM_DEFAULT_MODEL` |
 | reasoning_level | `high` | spawn/tell 입력 또는 `CLOUDROOM_DEFAULT_REASONING_LEVEL` |
 | github_repo | 생략 → Personal(내부 ID는 `proj_personal`) | 선택적 `CLOUDROOM_GITHUB_REPO`; 도구에는 허용된 GitHub `owner/repository`만 지정 가능 |
 
@@ -111,9 +111,8 @@ Personal에는 저장소가 없으므로 서버의 branch 기본값도 적용하
 다른 provider를 선택할 때는 호환되는 `model`·`reasoning_level`도 함께 지정하세요.
 provider별 유효 모델은 Cloudroom/해당 provider가 최종 검증합니다. 모델 이름을 추측해 변환하지 않습니다.
 
-Devin의 CLI provider ID는 Cloud에서도 `acp-devin`입니다. 내부 harness 이름 `devin`과 다릅니다.
-`gpt-6.1-sol`은 테스트에서 거부됐고, `gpt-6-1-sol-high`는 응답까지 확인했습니다.
-모델 이름의 `high` 접미사와 별개로 `--reasoning-level high`를 항상 명시합니다.
+Cloudroom의 `--provider pi`는 Pi 에이전트를 선택하고, `--model openai/gpt-6.2-sol`의 `openai/`는 Pi 안에서 OpenAI 제공자를 선택합니다.
+Thinking 기본값은 `--reasoning-level high`로 명시해 전달합니다. Devin은 호환되는 모델과 함께 `acp-devin`으로 계속 선택할 수 있습니다.
 
 Cloud는 full permissions로 실행합니다. 이 서버의 입력 검증은 원격 에이전트를 제한된 sandbox 권한으로 바꾸지 않습니다.
 요청 실행은 계정의 모델/Cloud 사용량을 소비할 수 있습니다.
@@ -129,8 +128,8 @@ Cloud는 full permissions로 실행합니다. 이 서버의 입력 검증은 원
   "title": "GitHub 저장소 확인",
   "github_repo": "owner/repository",
   "machine": "cloud",
-  "provider": "acp-devin",
-  "model": "gpt-6-1-sol-high",
+  "provider": "pi",
+  "model": "openai/gpt-6.2-sol",
   "reasoning_level": "high"
 }
 ```
@@ -164,7 +163,8 @@ Cloudroom의 request ID 처리를 사용하며, 서버는 자동 재시도하지
 {
   "thread_id": "thr_example",
   "prompt": "pwd && ls -la 의 결과를 출력하세요.",
-  "model": "gpt-6-1-sol-high",
+  "provider": "pi",
+  "model": "openai/gpt-6.2-sol",
   "reasoning_level": "high",
   "mode": "queue"
 }

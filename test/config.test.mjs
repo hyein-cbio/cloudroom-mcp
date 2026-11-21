@@ -12,8 +12,8 @@ test('Personal is the default; no repository or branch configuration is required
   assert.equal(loadConfig({ CLOUDROOM_GITHUB_REPO: '   ' }).githubRepo, null);
   assert.equal(loadConfig({ CLOUDROOM_DEFAULT_BASE_BRANCH: '' }).defaults.base_branch, null);
   assert.deepEqual(defaults.defaults, {
-    machine: 'cloud', base_branch: null, provider: 'acp-devin',
-    model: 'gpt-6-1-sol-high', reasoning_level: 'high',
+    machine: 'cloud', base_branch: null, provider: 'pi',
+    model: 'openai/gpt-6.2-sol', reasoning_level: 'high',
   });
   assert.throws(() => loadConfig({ CLOUDROOM_CLI_PATH: 'room-cli' }));
   assert.throws(() => loadConfig({ CLOUDROOM_SERVER_URL: 'http://example.com' }));

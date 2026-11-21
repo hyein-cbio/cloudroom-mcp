@@ -21,8 +21,8 @@ const prompt = z.string().min(1).max(48_000)
   .refine(value => value.trim().length > 0 && !value.includes('\0'), 'Prompt must be nonblank and contain no NUL')
   .refine(value => Buffer.byteLength(value, 'utf8') <= 48_000, 'Prompt must fit in 48000 UTF-8 bytes');
 const execution = {
-  provider: providerId.optional().describe('CLI provider ID, e.g. acp-devin (not devin). Omitted: server default.'),
-  model: modelId.optional().describe('Exact provider-specific model ID. Omitted: server default.'),
+  provider: providerId.optional().describe('Cloudroom agent harness ID, e.g. pi or acp-devin. Omitted: server default.'),
+  model: modelId.optional().describe('Exact model ID for the harness, including the model provider for Pi, e.g. openai/gpt-6.2-sol. Omitted: server default.'),
   reasoning_level: reasoningLevel.optional().describe('Explicit reasoning effort. Omitted: server default, not a model-name suffix.'),
 };
 

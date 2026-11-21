@@ -82,7 +82,7 @@ No local clone, machine source connection, or project ID lookup is needed. Missi
 - GitHub-backed tasks additionally need Cloudroom GitHub access. Only pushed remote content is available, not uncommitted local files.
 - **Known v142 limitation:** automatic registration of a missing GitHub project may be refused with `caller_proof_required`. This adapter does not forge caller proof. Register the repository yourself in the trusted Cloudroom app first, then retry with the same spawn UUID and inputs after inspecting projects. Existing matching projects avoid the registration endpoint; Personal does not need it.
 - The GitHub registration endpoint is internal and may change; recheck compatibility when updating Cloudroom. Do not use this adapter with an untrusted local control server.
-- The default `acp-devin` / `gpt-6-1-sol-high` / `high` is a previously tested author preset, **not a universally available model**. Set `CLOUDROOM_DEFAULT_PROVIDER`, `CLOUDROOM_DEFAULT_MODEL`, and `CLOUDROOM_DEFAULT_REASONING_LEVEL` together for your account. Model availability is controlled upstream.
+- The current source defaults to Pi / OpenAI GPT-6.2 Sol / `high`. This model is **not available on every account**. Set `CLOUDROOM_DEFAULT_PROVIDER`, `CLOUDROOM_DEFAULT_MODEL`, and `CLOUDROOM_DEFAULT_REASONING_LEVEL` together for your account. The pinned npm release above predates this change; set those variables explicitly to use the Pi preset with that release.
 
 ## Defaults and options
 
@@ -90,8 +90,8 @@ No local clone, machine source connection, or project ID lookup is needed. Missi
 |---|---|---|
 | machine | `cloud` | Cloud only; Local/native execution is intentionally excluded |
 | base_branch | Omitted | Repository projects only: spawn input or `CLOUDROOM_DEFAULT_BASE_BRANCH`; never sent for Personal |
-| provider | `acp-devin` | Spawn/tell input or `CLOUDROOM_DEFAULT_PROVIDER` |
-| model | `gpt-6-1-sol-high` | Spawn/tell input or `CLOUDROOM_DEFAULT_MODEL` |
+| provider (agent harness) | `pi` | Spawn/tell input or `CLOUDROOM_DEFAULT_PROVIDER` |
+| model | `openai/gpt-6.2-sol` | Spawn/tell input or `CLOUDROOM_DEFAULT_MODEL` |
 | reasoning_level | `high` | Spawn/tell input or `CLOUDROOM_DEFAULT_REASONING_LEVEL` |
 | github_repo | Omitted → Personal (`proj_personal` internally) | Optional `CLOUDROOM_GITHUB_REPO`; tool overrides must be allowlisted GitHub `owner/repository` identifiers |
 
@@ -112,9 +112,8 @@ Omitted execution options use **server defaults**, not the thread's existing set
 When choosing another provider, also supply a compatible `model` and `reasoning_level`.
 Cloudroom and the provider perform final model validation; this adapter does not guess or rewrite model IDs.
 
-Devin's CLI provider ID is `acp-devin`, including for Cloud execution. This differs from its internal harness name, `devin`.
-In testing, `gpt-6.1-sol` was rejected, while `gpt-6-1-sol-high` completed a response.
-Reasoning is always passed explicitly with `--reasoning-level`, independently of a model ID's `high` suffix.
+Cloudroom's `--provider pi` selects the Pi agent harness; the `openai/` prefix in `--model openai/gpt-6.2-sol` selects Pi's OpenAI provider.
+Thinking is passed explicitly as `--reasoning-level high` by default. Devin is still selectable as `acp-devin` with a compatible model.
 
 Cloud execution uses full permissions. Input validation in this server does not give the remote agent a restricted permission mode.
 Executing requests may consume your account's model and Cloud usage.
@@ -130,8 +129,8 @@ Executing requests may consume your account's model and Cloud usage.
   "title": "GitHub repository check",
   "github_repo": "owner/repository",
   "machine": "cloud",
-  "provider": "acp-devin",
-  "model": "gpt-6-1-sol-high",
+  "provider": "pi",
+  "model": "openai/gpt-6.2-sol",
   "reasoning_level": "high"
 }
 ```
@@ -166,7 +165,8 @@ Successful creation does not mean initialization or the task has completed.
 {
   "thread_id": "thr_example",
   "prompt": "Print the output of pwd && ls -la.",
-  "model": "gpt-6-1-sol-high",
+  "provider": "pi",
+  "model": "openai/gpt-6.2-sol",
   "reasoning_level": "high",
   "mode": "queue"
 }

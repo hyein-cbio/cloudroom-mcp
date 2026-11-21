@@ -37,8 +37,8 @@ export function loadConfig(env = process.env) {
     defaults: {
       machine: 'cloud',
       base_branch: configuredBranch ? branch.parse(configuredBranch) : null,
-      provider: providerId.parse(env.CLOUDROOM_DEFAULT_PROVIDER ?? 'acp-devin'),
-      model: modelId.parse(env.CLOUDROOM_DEFAULT_MODEL ?? 'gpt-6-1-sol-high'),
+      provider: providerId.parse(env.CLOUDROOM_DEFAULT_PROVIDER ?? 'pi'),
+      model: modelId.parse(env.CLOUDROOM_DEFAULT_MODEL ?? 'openai/gpt-6.2-sol'),
       reasoning_level: reasoningLevel.parse(env.CLOUDROOM_DEFAULT_REASONING_LEVEL ?? 'high'),
     },
   };

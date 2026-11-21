@@ -49,8 +49,10 @@ test('real stdio MCP client discovers exactly four tools and drives the full flo
   };
   const spawned = await call('thread_spawn', { prompt: 'hello', request_id: randomUUID() });
   assert.equal(spawned.thread_id, 'thr_test');
+  assert.equal(spawned.thread.providerId, 'pi');
   const told = await call('thread_tell', { thread_id: 'thr_test', prompt: '--help; $(echo not-a-shell)' });
   assert.equal(told.delivery.delivery, 'sent');
+  assert.deepEqual(told.requested_execution, { provider: 'pi', model: 'openai/gpt-6.2-sol', reasoning_level: 'high' });
   const got = await call('thread_get', { thread_id: 'thr_test', event_limit: 1 });
   assert.equal(got.latest_available_output.text, 'Echo: --help; $(echo not-a-shell)');
   assert.equal(got.execution.reasoningLevel, 'high');
@@ -152,7 +154,7 @@ test('legacy 2025 MCP handshake works for existing Pi/Devin clients', { timeout:
   const tools = await rpc('tools/list', {});
   assert.equal(tools.result.tools.length, 4);
   const response = await rpc('tools/call', { name: 'thread_get', arguments: { thread_id: 'thr_test' } });
-  assert.equal(response.result.structuredContent.execution.model, 'gpt-6-1-sol-high');
+  assert.equal(response.result.structuredContent.execution.model, 'openai/gpt-6.2-sol');
   const exited = new Promise(resolve => child.once('exit', resolve));
   child.stdin.end();
   assert.equal(await exited, 0);

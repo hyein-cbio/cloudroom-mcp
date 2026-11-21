@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Default Cloud execution to the Pi harness with `openai/gpt-6.2-sol` at `high` reasoning for both spawn and tell.
+
 ## 0.1.1 — 2026-11-06
 
 ### Added

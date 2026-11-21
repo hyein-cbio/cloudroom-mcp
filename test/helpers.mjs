@@ -13,10 +13,10 @@ export async function tempConfig(t, extra = {}) {
 export function info(overrides = {}) {
   return {
     thread: {
-      id: 'thr_test', executionTarget: 'cloud', projectId: 'proj_test', providerId: 'acp-devin',
+      id: 'thr_test', executionTarget: 'cloud', projectId: 'proj_test', providerId: 'pi',
       status: 'idle', archivedAt: null, deletedAt: null, updatedAt: 1,
     },
-    execution: { model: 'gpt-6-1-sol-high', reasoningLevel: 'high' },
+    execution: { model: 'openai/gpt-6.2-sol', reasoningLevel: 'high' },
     queuedMessageCount: 0,
     ...overrides,
   };

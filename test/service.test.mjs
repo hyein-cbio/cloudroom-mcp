@@ -5,7 +5,7 @@ import { createService } from '../src/service.mjs';
 import { GatewayError } from '../src/cli.mjs';
 import { tempConfig, fakeCli, info, threadCalls } from './helpers.mjs';
 
-test('spawn forces cloud and explicit high/high defaults, omitting an unconfigured branch', async t => {
+test('spawn forces Cloud and explicit Pi defaults, omitting an unconfigured branch', async t => {
   const config = await tempConfig(t);
   const cli = fakeCli();
   const service = createService(config, cli.run);
@@ -13,7 +13,7 @@ test('spawn forces cloud and explicit high/high defaults, omitting an unconfigur
   const result = await service.call('thread_spawn', { request_id, prompt: '--help; $(touch /tmp/not-run)' });
   const args = threadCalls(cli)[0].args;
   assert.deepEqual(args.slice(0, 12), ['thread', 'spawn', '--machine', 'cloud', '--project', 'proj_test',
-    '--provider', 'acp-devin', '--model', 'gpt-6-1-sol-high', '--reasoning-level', 'high']);
+    '--provider', 'pi', '--model', 'openai/gpt-6.2-sol', '--reasoning-level', 'high']);
   assert(!args.includes('--base-branch'));
   assert.equal(result.requested_execution.base_branch, null);
   assert(args.includes('--prompt=--help; $(touch /tmp/not-run)'));
@@ -35,7 +35,7 @@ test('spawn binds option-like titles to --title= without changing Cloud argv', a
     const args = threadCalls(cli).filter(call => call.args[1] === 'spawn').at(-1).args;
     assert.deepEqual(args, [
       'thread', 'spawn', '--machine', 'cloud', '--project', 'proj_test',
-      '--provider', 'acp-devin', '--model', 'gpt-6-1-sol-high', '--reasoning-level', 'high',
+      '--provider', 'pi', '--model', 'openai/gpt-6.2-sol', '--reasoning-level', 'high',
       '--request-id', request_id, '--prompt=hi', '--json', '--title=' + title,
     ]);
     assert.equal(args.includes('--title'), false);
@@ -59,12 +59,18 @@ test('spawn accepts explicit option overrides only for allowlisted GitHub reposi
   assert.equal(cli.calls.length, before);
 });
 
-test('tell updates and verifies medium -> high, then sends both flags and safely delimits prompt', async t => {
-  const cli = fakeCli(info({ execution: { model: 'gpt-6-1-sol-medium', reasoningLevel: 'medium' } }));
+test('tell switches an idle Devin thread to the Pi defaults and verifies them before sending', async t => {
+  const cli = fakeCli(info({
+    thread: { ...info().thread, providerId: 'acp-devin' },
+    execution: { model: 'gpt-6-1-sol-high', reasoningLevel: 'high' },
+  }));
   const service = createService(await tempConfig(t), cli.run);
   const result = await service.call('thread_tell', { thread_id: 'thr_test', prompt: '--help' });
-  assert.deepEqual(threadCalls(cli).map(call => call.args[1]), ['show', 'interactions', 'update', 'show', 'tell']);
-  assert.deepEqual(cli.calls.at(-1).args, ['thread', 'tell', 'thr_test', '--model', 'gpt-6-1-sol-high',
+  const calls = threadCalls(cli);
+  assert.deepEqual(calls.map(call => call.args[1]), ['show', 'interactions', 'update', 'show', 'tell']);
+  assert.deepEqual(calls[2].args, ['thread', 'update', 'thr_test', '--model', 'openai/gpt-6.2-sol',
+    '--reasoning-level', 'high', '--json', '--provider', 'pi']);
+  assert.deepEqual(cli.calls.at(-1).args, ['thread', 'tell', 'thr_test', '--model', 'openai/gpt-6.2-sol',
     '--reasoning-level', 'high', '--mode', 'queue', '--json', '--', '--help']);
   assert.equal(result.settings_updated, true);
   assert.equal(result.native_session_may_have_changed, true);
